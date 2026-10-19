@@ -1,10 +1,14 @@
 name: Publish Supabase Admin Draft (TEST)
 
 on:
+  schedule:
+    # Temporary polling until a trusted event-driven publisher is deployed.
+    # GitHub scheduled runs can be delayed; this is not instant delivery.
+    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       draft_id:
-        description: "Optional pending draft UUID (empty = oldest pending)"
+        description: "Optional pending draft UUID (empty = newest eligible pending)"
         required: false
         type: string
 
