@@ -607,20 +607,38 @@ public class MainActivity extends Activity {
     android.content.Context app=getApplicationContext();
     new Thread(()->{
       boolean updated=false;
+      String syncError=null;
+      int remoteVersion=0;
       try{
         FullCatalogEnvelope envelope=SupabaseSignedCatalogReader.download(SUPABASE_URL,key);
+        remoteVersion=envelope.version;
         updated=FullCatalogSync.cacheVerified(app,envelope);
       }catch(Exception ex){
+        syncError=ex.getClass().getSimpleName()+": "+String.valueOf(ex.getMessage());
         android.util.Log.e("SupabaseConfigSync","Signed publication fetch failed",ex);
       }
       final boolean changed=updated;
+      final String failure=syncError;
+      final int receivedVersion=remoteVersion;
       runOnUiThread(()->{
         catalogSyncInFlight=false;
-        if(!changed || isFinishing() || isDestroyed())return;
+        if(isFinishing() || isDestroyed())return;
+        android.content.SharedPreferences diagnostics=getSharedPreferences("studio_supabase_diagnostics",MODE_PRIVATE);
+        if(failure!=null){
+          // Surface the actual cause once, not on every 60-second poll.
+          if(!failure.equals(diagnostics.getString("last_error",""))){
+            Toast.makeText(this,"Config: ошибка загрузки Supabase: "+failure,Toast.LENGTH_LONG).show();
+          }
+          diagnostics.edit().putString("last_error",failure).apply();
+          return;
+        }
+        diagnostics.edit().remove("last_error").putInt("last_received_version",receivedVersion).apply();
+        if(!changed)return;
         refreshPublishedSplash();
         features.clear();
         features.addAll(StudioSettings.load(this));
         if(view!=null)view.invalidate();
+        Toast.makeText(this,"Config: настройки сервера обновлены, версия "+receivedVersion,Toast.LENGTH_LONG).show();
       });
     },"MazdaSupabaseConfigSync").start();
   }
