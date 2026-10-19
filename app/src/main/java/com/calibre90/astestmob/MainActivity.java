@@ -1888,6 +1888,20 @@ public class MainActivity extends Activity {
       }catch(Exception ignored){}
       TextView versionInfo=caption("◉  Версия: "+appVersion,10,Color.rgb(98,106,116),false);
       place(root,versionInfo,.095f,.835f,.78f,.030f,width,height);
+      // Permanent diagnostic: a short Toast is too easy to miss during startup.
+      android.content.SharedPreferences syncState=getSharedPreferences("studio_supabase_diagnostics",MODE_PRIVATE);
+      org.json.JSONObject verifiedSnapshot=FullCatalogSync.cached(this);
+      int cachedVersion=getSharedPreferences("studio_published_full_catalog",MODE_PRIVATE).getInt("version",0);
+      String lastError=syncState.getString("last_error","");
+      String syncLabel=verifiedSnapshot!=null
+          ? "Supabase: v"+cachedVersion+" • функций "+StudioSettings.published(this).size()
+          : "Supabase: нет проверенных настроек";
+      if(!lastError.isEmpty())syncLabel+=" • ошибка: "+lastError;
+      TextView syncInfo=caption(syncLabel,9,lastError.isEmpty()?Color.rgb(58,98,80):Color.rgb(190,35,45),false);
+      syncInfo.setMaxLines(3);
+      syncInfo.setOnClickListener(v->refreshPublishedCatalog());
+      place(root,syncInfo,.095f,.858f,.82f,.045f,width,height);
+
 
       TextView ok=caption("Закрыть",16,Color.WHITE,true);ok.setGravity(Gravity.CENTER);
       ok.setBackground(panel(Color.rgb(245,69,69),Color.rgb(170,0,10),9,Color.rgb(255,103,109)));
