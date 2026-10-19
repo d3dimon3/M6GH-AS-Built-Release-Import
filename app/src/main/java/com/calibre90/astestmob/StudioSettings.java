@@ -53,15 +53,15 @@ public final class StudioSettings {
   }
   public static String moduleName(Context ctx,String id,String fallback){
     String local=ctx.getSharedPreferences(PREF,0).getString("module_name_"+id,null);
-    if(local!=null)return local;
     String published=PublishedFullSettings.moduleSetting(ctx,"module_name_"+id);
-    return published==null?fallback:published;
+    if(!"com.calibre90.catalogadmin".equals(ctx.getPackageName()) && published!=null)return published;
+    return local==null?(published==null?fallback:published):local;
   }
   public static String moduleVersion(Context ctx,String id){
     String local=ctx.getSharedPreferences(PREF,0).getString("module_version_"+id,null);
-    if(local!=null)return local;
     String published=PublishedFullSettings.moduleSetting(ctx,"module_version_"+id);
-    return published==null?"":published;
+    if(!"com.calibre90.catalogadmin".equals(ctx.getPackageName()) && published!=null)return published;
+    return local==null?(published==null?"":published):local;
   }
   public static void saveModule(Context ctx,String id,String name,String version){
     if(!ctx.getSharedPreferences(PREF,0).edit()
