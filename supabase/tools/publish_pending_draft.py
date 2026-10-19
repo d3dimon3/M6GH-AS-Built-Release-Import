@@ -48,8 +48,18 @@ def api(path, method="GET", body=None):
                 raise ValueError("Response too large")
             return json.loads(result) if result else None
     except urllib.error.HTTPError as error:
-        # Never log credentials or full response bodies.
-        raise RuntimeError(f"Supabase {method} failed: HTTP {error.code}") from error
+        # Log only a short, machine-readable error code; never dump bodies or credentials.
+        diagnostic = error.headers.get("x-supabase-error-code", "")
+        try:
+            error_payload = json.loads(error.read(4096))
+            if isinstance(error_payload, dict):
+                diagnostic = diagnostic or error_payload.get("code", "")
+        except (ValueError, UnicodeError):
+            pass
+        if not isinstance(diagnostic, str) or not diagnostic.replace("_", "").replace("-", "").isalnum() or len(diagnostic) > 80:
+            diagnostic = ""
+        suffix = f" (code: {diagnostic})" if diagnostic else ""
+        raise RuntimeError(f"Supabase {method} failed: HTTP {error.code}{suffix}") from error
 
 
 def main():
