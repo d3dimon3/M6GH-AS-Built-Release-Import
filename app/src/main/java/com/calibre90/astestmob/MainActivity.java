@@ -569,32 +569,60 @@ public class MainActivity extends Activity {
       }
     },1500);
   }
-  /** Refresh only published feature definitions; never replace a locally edited draft. */
-  private static final String FULL_CATALOG_URL = "https://raw.githubusercontent.com/Calibre90/as_test_mob/main/publication/studio-published-settings.json";
+  /** Supabase is the only online source in the migration build; no legacy GitHub fallback. */
+  private static final String SUPABASE_URL = "https://zyksvoauffhexketcyrq.supabase.co";
+  private static final long SYNC_INTERVAL_MS = 60000L;
+  private final Handler catalogHandler = new Handler(Looper.getMainLooper());
+  private boolean catalogSyncInFlight = false;
+  private boolean catalogSyncActive = false;
+  private final Runnable catalogPoll = new Runnable(){
+    @Override public void run(){
+      if(!catalogSyncActive || isFinishing() || isDestroyed())return;
+      refreshPublishedCatalog();
+      catalogHandler.postDelayed(this,SYNC_INTERVAL_MS);
+    }
+  };
+  @Override protected void onResume(){
+    super.onResume();
+    if(!getClass().getName().equals("com.calibre90.astestmob.StandaloneAdminActivity")){
+      catalogSyncActive=true;
+      catalogHandler.removeCallbacks(catalogPoll);
+      catalogHandler.post(catalogPoll);
+    }
+  }
+  @Override protected void onPause(){
+    catalogSyncActive=false;
+    catalogHandler.removeCallbacks(catalogPoll);
+    super.onPause();
+  }
+  /** Fetch signed, published Supabase settings; drafts are never accepted by Config. */
   void refreshPublishedCatalog(){
-    if(!FULL_CATALOG_URL.isEmpty()){
-      android.content.Context app=getApplicationContext();
-      new Thread(()->{
-        if(!FullCatalogSync.refresh(app,FULL_CATALOG_URL))return;
-        runOnUiThread(()->{
-          if(isFinishing()||isDestroyed())return;
-          // A signed server publication must refresh Studio feature definitions even
-          // when an older build left a local feature draft behind.
-          // Apply the newly verified online splash immediately; it will also survive offline launches.
-          refreshPublishedSplash();
-          features.clear();
-          features.addAll(StudioSettings.load(this));
-          if(view!=null)view.invalidate();
-        });
-      },"MazdaFullCatalogSync").start();
+    if(catalogSyncInFlight)return;
+    final String key=BuildConfig.SUPABASE_PUBLISHABLE_KEY;
+    if(key==null || !key.startsWith("sb_publishable_")){
+      android.util.Log.e("SupabaseConfigSync","Missing Supabase publishable key in APK build");
       return;
     }
-    CatalogSync.refresh(this,()->{
-      if(isFinishing()||isDestroyed()||StudioSettings.hasLocalDraft(this))return;
-      features.clear();
-      features.addAll(StudioSettings.load(this));
-      if(view!=null)view.invalidate();
-    });
+    catalogSyncInFlight=true;
+    android.content.Context app=getApplicationContext();
+    new Thread(()->{
+      boolean updated=false;
+      try{
+        FullCatalogEnvelope envelope=SupabaseSignedCatalogReader.download(SUPABASE_URL,key);
+        updated=FullCatalogSync.cacheVerified(app,envelope);
+      }catch(Exception ex){
+        android.util.Log.e("SupabaseConfigSync","Signed publication fetch failed",ex);
+      }
+      final boolean changed=updated;
+      runOnUiThread(()->{
+        catalogSyncInFlight=false;
+        if(!changed || isFinishing() || isDestroyed())return;
+        refreshPublishedSplash();
+        features.clear();
+        features.addAll(StudioSettings.load(this));
+        if(view!=null)view.invalidate();
+      });
+    },"MazdaSupabaseConfigSync").start();
   }
   /** Built-in sample configuration: available before importing any vehicle ABT. */
   void seedBuiltInRows(){
