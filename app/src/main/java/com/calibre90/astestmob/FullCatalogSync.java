@@ -65,12 +65,13 @@ final class FullCatalogSync {
       if(envelope.version<=current)return false;
       // Keep the original exact signed payload: never reserialize before verification.
       JSONObject document=envelope.document;
-      if(!CatalogSignature.verifyFull(document))return false;
+      if(!CatalogSignature.verifyFull(document))
+        throw new SecurityException("Published settings signature rejected by Config");
       return prefs.edit().putInt("version",envelope.version)
           .putString("signed_document",document.toString()).commit();
     }catch(Exception ex){
       android.util.Log.e("SupabaseConfigSync","Cannot cache signed publication",ex);
-      return false;
+      throw new IllegalStateException("Cannot cache signed publication: "+ex.getMessage(),ex);
     }
   }
 
