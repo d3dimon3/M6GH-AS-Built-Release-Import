@@ -598,7 +598,7 @@ public class MainActivity extends Activity {
   /** Fetch signed, published Supabase settings; drafts are never accepted by Config. */
   void refreshPublishedCatalog(){
     if(catalogSyncInFlight)return;
-    final String key=BuildConfig.SUPABASE_PUBLISHABLE_KEY;
+    final String key=SupabasePublicKey.VALUE;
     if(key==null || !key.startsWith("sb_publishable_")){
       android.util.Log.e("SupabaseConfigSync","Missing Supabase publishable key in APK build");
       return;
