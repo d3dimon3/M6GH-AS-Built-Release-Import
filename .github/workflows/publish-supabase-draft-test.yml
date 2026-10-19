@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: supabase-test-publisher
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
