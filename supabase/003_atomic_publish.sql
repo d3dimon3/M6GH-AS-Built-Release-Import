@@ -40,7 +40,7 @@ BEGIN
   v_new_version := v_version + 1;
   IF p_envelope->>'kind' IS DISTINCT FROM 'mazda6gh-published-settings'
      OR p_envelope->>'schema' IS DISTINCT FROM '2'
-     OR (p_envelope->>'version')::bigint <> v_new_version
+     OR p_envelope->>'version' IS DISTINCT FROM v_new_version::text
      OR p_envelope->>'signature' IS NULL
      OR length(p_envelope->>'signature') < 100
      OR p_envelope->>'snapshot_payload' IS NULL
