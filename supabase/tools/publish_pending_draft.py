@@ -11,6 +11,8 @@ Do not run this in Android or put these credentials in the repository.
 import base64
 import json
 import os
+import re
+from pathlib import Path
 import sys
 import urllib.error
 import urllib.parse
@@ -98,6 +100,19 @@ def main():
     key = serialization.load_pem_private_key(key_bytes, password=None)
     if not isinstance(key, rsa.RSAPrivateKey) or key.key_size < 3072:
         raise RuntimeError("Catalog signing key must be RSA >= 3072 bits")
+    # Fail before publication if the CI private key does not match the exact
+    # public key pinned in the Android Config APK.
+    verifier_source = Path("app/src/main/java/com/calibre90/astestmob/CatalogSignature.java").read_text(encoding="utf-8")
+    pinned_match = re.search(r'CATALOG_PUBLIC_KEY_BASE64\\s*=\\s*"([A-Za-z0-9+/=]+)"', verifier_source)
+    if not pinned_match:
+        raise RuntimeError("Pinned Android catalog public key not found")
+    expected_der = base64.b64decode(pinned_match.group(1), validate=True)
+    signing_der = key.public_key().public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    if signing_der != expected_der:
+        raise RuntimeError("Catalog signer does not match Android Config public key; publication refused")
     message = f"MAZDA6GH-SETTINGS-V2\n{version}\n{raw}".encode("utf-8")
     signature = base64.b64encode(key.sign(message, padding.PKCS1v15(), hashes.SHA256())).decode("ascii")
     envelope = {
