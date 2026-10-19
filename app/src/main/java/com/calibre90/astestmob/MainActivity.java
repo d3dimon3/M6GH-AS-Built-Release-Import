@@ -716,9 +716,13 @@ public class MainActivity extends Activity {
   }
   org.json.JSONArray customModuleCatalog(){
     try{
+      // Config and its built-in editor display the same verified publication.
+      // Only the standalone Admin APK owns unpublished local drafts.
+      org.json.JSONArray published=PublishedFullSettings.modules(this);
+      if(!"com.calibre90.catalogadmin".equals(getPackageName()) && published!=null)
+        return published;
       String local=getSharedPreferences("studio_custom_modules",MODE_PRIVATE).getString("catalog",null);
       if(local!=null)return new org.json.JSONArray(local);
-      org.json.JSONArray published=PublishedFullSettings.modules(this);
       return published==null?new org.json.JSONArray():published;
     }catch(Exception ex){return new org.json.JSONArray();}
   }
