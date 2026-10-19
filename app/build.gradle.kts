@@ -9,6 +9,17 @@ android {
         versionCode = (project.findProperty("buildNumber")?.toString()?.toIntOrNull() ?: 1)
         versionName = "1.0." + (project.findProperty("buildNumber")?.toString()?.toIntOrNull() ?: 1).toString()
     }
+    buildFeatures { buildConfig = true }
+    // Publishable key is public, but must be provided to the test build explicitly.
+    val supabasePublicKey = System.getenv("SUPABASE_PUBLISHABLE_KEY") ?: ""
+    buildTypes {
+        getByName("debug") {
+            buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + supabasePublicKey + "\"")
+        }
+        getByName("release") {
+            buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + supabasePublicKey + "\"")
+        }
+    }
     // One stable signing key is required for Android in-place upgrades.
     // CI falls back to its ephemeral debug key until the owner configures secrets.
     val signingFile = System.getenv("MAZDA_SIGNING_STORE_FILE")
