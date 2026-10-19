@@ -1,0 +1,211 @@
+name: TEST Supabase Migration APKs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out post-476 Release candidate source
+        uses: actions/checkout@v4
+        with:
+          ref: supabase-sync-migration
+          persist-credentials: false
+
+      - name: Check out branded assets from main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: _brand_assets
+          sparse-checkout: |
+            M6GH_AS-BUILT_CONFIG_assets.zip
+            M6_GH_Admin_Icon.zip
+          persist-credentials: false
+
+      - name: Install UI assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/res/drawable-nodpi
+          rm -rf /tmp/mazda_assets
+          unzip -q Mazda6GH_WhiteRed_Complete_UI_Assets.zip -d /tmp/mazda_assets
+          find /tmp/mazda_assets/Mazda6GH_WhiteRed_Production_Assets -name '*.png' -exec cp {} app/src/main/res/drawable-nodpi/ \;
+          unzip -q -j Mazda6GH_Header_and_Lock_Assets.zip '*.png' -d app/src/main/res/drawable-nodpi/
+          echo "Installed $(find app/src/main/res/drawable-nodpi -name '*.png' | wc -l) PNG assets"
+
+      - name: Install M6GH banner and verify Studio images
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import struct
+          import zipfile
+          from pathlib import Path
+
+          dest = Path('app/src/main/res/drawable-nodpi')
+          dest.mkdir(parents=True, exist_ok=True)
+          archive = Path('_brand_assets/M6GH_AS-BUILT_CONFIG_assets.zip')
+          with zipfile.ZipFile(archive) as z:
+              header = z.read('m6gh_header.png')
+          (dest / 'header_mazda_no_lock.png').write_bytes(header)
+
+          for name, min_width, min_height in (
+              ('splash_studio.png', 512, 512),
+              ('icon_studio.png', 512, 512),
+              ('header_mazda_no_lock.png', 1000, 250),
+          ):
+              path = dest / name
+              if not path.is_file():
+                  raise SystemExit(f'Missing required image: {path}')
+              data = path.read_bytes()
+              if len(data) < 24 or data[:8] != bytes.fromhex('89504e470d0a1a0a') or data[12:16] != b'IHDR':
+                  raise SystemExit(f'Invalid PNG: {path}')
+              width, height = struct.unpack('>II', data[16:24])
+              if width < min_width or height < min_height:
+                  raise SystemExit(f'Image too small: {path}: {width}x{height}')
+              print(f'Validated {name}: {width}x{height}')
+          PY
+
+      - name: Install corrected Admin launcher icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import struct
+          import zipfile
+          from pathlib import Path
+
+          archive = Path('_brand_assets/M6_GH_Admin_Icon.zip')
+          with zipfile.ZipFile(archive) as z:
+              files = [name for name in z.namelist() if name.lower().endswith('.png') and not name.startswith('__MACOSX/')]
+              if len(files) != 1:
+                  raise SystemExit(f'Expected one PNG in Admin icon archive; found {files}')
+              data = z.read(files[0])
+          if len(data) < 24 or data[:8] != b'\x89PNG\r\n\x1a\n' or data[12:16] != b'IHDR':
+              raise SystemExit('Invalid Admin icon PNG')
+          width, height = struct.unpack('>II', data[16:24])
+          if min(width, height) < 256:
+              raise SystemExit(f'Admin icon too small: {width}x{height}')
+          target = Path('app/src/main/res/drawable-nodpi/admin_icon.png')
+          target.parent.mkdir(parents=True, exist_ok=True)
+          target.write_bytes(data)
+          print(f'Installed Admin icon: {width}x{height}')
+          PY
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Check admin module inputs
+        run: |
+          test -f catalog-admin/src/main/java/com/calibre90/catalogadmin/AdminActivity.java
+          test -f catalog-admin/src/main/AndroidManifest.xml
+
+      - name: Test RSA catalog signing and tamper rejection
+        run: python3 catalog/test_signing.py
+
+      - name: Validate FAQ publication schema regression tests
+        run: python3 tools/test_faq_snapshot.py
+
+      - name: Run ABT and feature engine regression tests
+        run: |
+          mkdir -p /tmp/abt-test-classes
+          javac -d /tmp/abt-test-classes app/src/main/java/com/calibre90/astestmob/AbtCodec.java app/src/main/java/com/calibre90/astestmob/FeatureEngine.java app/src/main/java/com/calibre90/astestmob/AbtSnapshot.java app/src/test/java/com/calibre90/astestmob/CodecSelfTest.java
+          java -cp /tmp/abt-test-classes com.calibre90.astestmob.CodecSelfTest
+
+      - name: Prepare stable Android signing key
+        env:
+          MAZDA_KEYSTORE_B64: ${{ secrets.MAZDA_KEYSTORE_B64 }}
+          STORE_PASS: ${{ secrets.MAZDA_SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MAZDA_SIGNING_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.MAZDA_SIGNING_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$MAZDA_KEYSTORE_B64" ] || [ -z "$STORE_PASS" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASS" ]; then
+            echo "::error::Signing secrets are missing"
+            exit 1
+          fi
+          echo "::add-mask::$STORE_PASS"
+          echo "::add-mask::$KEY_ALIAS"
+          echo "::add-mask::$KEY_PASS"
+          printf '%s' "$MAZDA_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/mazda-update-key.jks"
+          if ! keytool -list -keystore "$RUNNER_TEMP/mazda-update-key.jks" -storepass "$STORE_PASS" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+            echo "::error::Signing keystore cannot be opened"
+            exit 1
+          fi
+          {
+            echo "MAZDA_SIGNING_STORE_FILE=$RUNNER_TEMP/mazda-update-key.jks"
+            echo "MAZDA_SIGNING_STORE_PASSWORD=$STORE_PASS"
+            echo "MAZDA_SIGNING_KEY_ALIAS=$KEY_ALIAS"
+            echo "MAZDA_SIGNING_KEY_PASSWORD=$KEY_PASS"
+          } >> "$GITHUB_ENV"
+          echo "Signing keystore validated"
+
+      - name: Build both Android Release APKs
+        run: gradle :app:assembleRelease :catalog-admin:assembleRelease -PbuildNumber=$((1000 + ${{ github.run_number }})) --stacktrace
+
+      - name: Align and sign Release APKs using existing update certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -name zipalign -type f | sort -V | tail -1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          test -n "$ZIPALIGN" && test -n "$APKSIGNER"
+          for module in app catalog-admin; do
+            input="$module/build/outputs/apk/release/$module-release-unsigned.apk"
+            test -s "$input"
+            aligned="$RUNNER_TEMP/$module-release-aligned.apk"
+            output="$module/build/outputs/apk/release/$module-release.apk"
+            "$ZIPALIGN" -f -p 4 "$input" "$aligned"
+            "$APKSIGNER" sign --ks "$MAZDA_SIGNING_STORE_FILE" --ks-key-alias "$MAZDA_SIGNING_KEY_ALIAS" --ks-pass env:MAZDA_SIGNING_STORE_PASSWORD --key-pass env:MAZDA_SIGNING_KEY_PASSWORD --out "$output" "$aligned"
+            "$APKSIGNER" verify --verbose --print-certs "$output"
+          done
+
+      - name: Verify APK outputs
+        run: |
+          test -s app/build/outputs/apk/release/app-release.apk
+          test -s catalog-admin/build/outputs/apk/release/catalog-admin-release.apk
+          ls -lh app/build/outputs/apk/release/app-release.apk catalog-admin/build/outputs/apk/release/catalog-admin-release.apk
+
+      - name: Verify both APKs use the same persistent certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          test -n "$APKSIGNER"
+          STUDIO=app/build/outputs/apk/release/app-release.apk
+          ADMIN=catalog-admin/build/outputs/apk/release/catalog-admin-release.apk
+          "$APKSIGNER" verify --verbose --print-certs "$STUDIO" > /tmp/studio-cert.txt
+          "$APKSIGNER" verify --verbose --print-certs "$ADMIN" > /tmp/admin-cert.txt
+          studio_sha="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/studio-cert.txt | head -1)"
+          admin_sha="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/admin-cert.txt | head -1)"
+          test -n "$studio_sha" && test "$studio_sha" = "$admin_sha"
+          echo "Both APKs signed with certificate SHA-256: $studio_sha"
+
+      - name: Upload Config Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: TEST-SUPABASE-CONFIG-APK
+          path: app/build/outputs/apk/release/app-release.apk
+          retention-days: 1
+
+      - name: Upload Admin Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: TEST-SUPABASE-ADMIN-APK
+          path: catalog-admin/build/outputs/apk/release/catalog-admin-release.apk
+          retention-days: 1
