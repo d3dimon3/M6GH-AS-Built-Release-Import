@@ -1,0 +1,40 @@
+name: Publish Supabase Admin Draft (TEST)
+
+on:
+  workflow_dispatch:
+    inputs:
+      draft_id:
+        description: "Optional pending draft UUID (empty = oldest pending)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: supabase-publisher-test
+    steps:
+      - name: Checkout migration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: supabase-sync-migration
+          persist-credentials: false
+      - name: Install RSA signing dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography
+      - name: Check publisher secrets are configured
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CATALOG_SIGNING_PRIVATE_KEY_PEM: ${{ secrets.CATALOG_SIGNING_PRIVATE_KEY_PEM }}
+        run: |
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "Missing SUPABASE_SERVICE_ROLE_KEY"; exit 1; }
+          test -n "$CATALOG_SIGNING_PRIVATE_KEY_PEM" || { echo "Missing CATALOG_SIGNING_PRIVATE_KEY_PEM"; exit 1; }
+      - name: Validate, sign, and atomically publish
+        env:
+          SUPABASE_URL: https://zyksvoauffhexketcyrq.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CATALOG_SIGNING_PRIVATE_KEY_PEM: ${{ secrets.CATALOG_SIGNING_PRIVATE_KEY_PEM }}
+          PUBLISHER_DRAFT_ID: ${{ inputs.draft_id }}
+        run: python3 supabase/tools/publish_pending_draft.py
