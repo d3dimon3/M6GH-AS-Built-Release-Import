@@ -10,9 +10,9 @@ import java.security.spec.X509EncodedKeySpec;
 
 /** Verifies the publisher's RSA signature, independently of license activation. */
 final class CatalogSignature {
-  // Set to a dedicated catalog-signing RSA public key after generating the publisher key pair.
+  // Dedicated RSA 3072-bit catalog verification key (public only).
   // Never reuse or embed the private license-generation key.
-  private static final String CATALOG_PUBLIC_KEY_BASE64 = "MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAmdmD0x5h5YVrtzkkTW8crB4GgupJ/0DXnD3BjTeM4m9wd4ugCbrcf+0+5PlV9j6uNTY71NBudbH3xQR86GPi2+GlFOzBzeDOiRr9ZHaspdVpCHAGA37eGnR2sDWEGmmN3i7GeglW75hcpUKdMJ94Z6ZYTH6Bl+fUjZXujb9ABN3SWizQK121CbgU9RghFpXN71IULj9xQwpXgtCNrRib54z2qAsP4V2YUoRoLOHjFclj8GLnu5DCvk6ucy19aKGN80SJi/yQxIVR5Ac5E0GhOxcJ/Q6q1gTaycwkbyiTPm4yX853qUSHbjBdAKoBLEu2CpW+cZINE2gqGrgEAYNw9sMHi3ggQ8VxkX4RGthiFHXQCtdu+U8WcRFGNmXpRrLPIAYhPR+9OGGmxpmojbriXQkkttDqbTgUpRukezYDa83DemVq5dCrWFRS0k71nIfizvreVvZkLtq/vKbPvipHXtXCZBZBA1OdvXT30GtJ2fiET8C7SWmavoru1of3/ULFAgMBAAE=";
+  private static final String CATALOG_PUBLIC_KEY_BASE64 = "MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAoqrQX71QDDkyQ9Jru5IwEjPw6GUclNHYD1Ve3I9Le/7+p7LIOR6h914ZuVBPrPFIptTrRkshmieU/YgYYd/eURvJHn0ovKPOrt2wytN5rv/teah3pERQDFpsZaaL/ZJZ73yH4sijciaGjFCzhjLNXDB3A+kkIvpqIQtVXARobF15JTJ8I7V4TLBFc/s7gSlUHCDsvzhY1yLe6zdH8DoIAZlzZVhVI/wcB1Qm8pSAERkE6f8QPPPYyuxfydFMIBrBwFNjtCajjHA7wpURuZKotwisKVAA3w6iFcnyVhgmQH6D7fD+gUPTj9vaPHzzSIAghQvAA3qL3+06C4uLEtSZ3vodcYxKf18+VL/bUi6558XPrsQ/1NQ+mEbGTFDx2npV6iXwWe21YR6t1DiD2Gl09fJo5pyqaAzSTF5dQ3jFNjvqL0xOXHbIpTWnViy54GM39KHfg2R6rzAC9SxTUr8z9bky6K/ZXMYmoBLPwyf90+RTaqR9PzmFWkGxewXSjHp7AgMBAAE=";
   private CatalogSignature(){}
 
   /** Verify a full published configuration; never trust an unsigned admin export. */
