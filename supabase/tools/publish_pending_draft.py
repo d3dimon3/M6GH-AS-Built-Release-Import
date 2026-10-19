@@ -103,7 +103,7 @@ def main():
     # Fail before publication if the CI private key does not match the exact
     # public key pinned in the Android Config APK.
     verifier_source = Path("app/src/main/java/com/calibre90/astestmob/CatalogSignature.java").read_text(encoding="utf-8")
-    pinned_match = re.search(r'CATALOG_PUBLIC_KEY_BASE64\\s*=\\s*"([A-Za-z0-9+/=]+)"', verifier_source)
+    pinned_match = re.search(r'CATALOG_PUBLIC_KEY_BASE64\s*=\s*"([A-Za-z0-9+/=]+)"', verifier_source)
     if not pinned_match:
         raise RuntimeError("Pinned Android catalog public key not found")
     expected_der = base64.b64decode(pinned_match.group(1), validate=True)
