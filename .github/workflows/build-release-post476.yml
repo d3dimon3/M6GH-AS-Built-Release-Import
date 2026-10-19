@@ -29,25 +29,31 @@ jobs:
           echo "Installed $(find app/src/main/res/drawable-nodpi -name '*.png' | wc -l) PNG assets"
       - name: Install Studio splash and icon assets
         shell: bash
+              - name: Install M6GH banner and verify Studio images
+        shell: bash
         run: |
           set -euo pipefail
-          # The legacy Mazda6GH-AsBuilt-Studio-Android repository is no longer required.
-          # The next step installs the current launcher icon from this repository.
-          # Use a local packaged image as the default splash; ADMIN can replace it online.
+
           python3 - <<'PY'
-          import zipfile,struct
+          import zipfile, struct
           from pathlib import Path
-          archive=Path('Mazda6GH_WhiteRed_Complete_UI_Assets.zip')
-          dest=Path('app/src/main/res/drawable-nodpi')
-          dest.mkdir(parents=True,exist_ok=True)
+
+          dest = Path("app/src/main/res/drawable-nodpi")
+          dest.mkdir(parents=True, exist_ok=True)
+
+          archive = Path("_brand_assets/M6GH_AS-BUILT_CONFIG_assets.zip")
           with zipfile.ZipFile(archive) as z:
-              candidates=[p for p in z.namelist() if p.lower().endswith('.png') and 'splash' in p.lower()]
-              if candidates:
-                  data=z.read(candidates[0])
-                  (dest/'splash_studio.png').write_bytes(data)
-                  print('Installed local splash:',candidates[0])
-              else:
-                  print('No splash in local archive; using current M6GH brand image from next step')
+              data = z.read("m6gh_header.png")
+              (dest / "header_mazda_no_lock.png").write_bytes(data)
+
+          for name in ("splash_studio.png", "icon_studio.png",
+                       "header_mazda_no_lock.png"):
+              path = dest / name
+              data = path.read_bytes()
+              if data[:8] != bytes.fromhex("89504e470d0a1a0a") or data[12:16] != b"IHDR":
+                  raise SystemExit(f"Invalid PNG: {path}")
+              w, h = struct.unpack(">II", data[16:24])
+              print(f"Verified {name}: {w}x{h}")
           PY
       - name: Install M6GH AS-BUILT CONFIG banner and launcher icon
         shell: bash
