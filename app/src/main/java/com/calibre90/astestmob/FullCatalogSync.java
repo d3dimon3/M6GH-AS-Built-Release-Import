@@ -62,13 +62,21 @@ final class FullCatalogSync {
     try{
       SharedPreferences prefs=context.getApplicationContext().getSharedPreferences(STORE,Context.MODE_PRIVATE);
       int current=prefs.getInt("version",0);
-      if(envelope.version<=current)return false;
+      // A stored version number alone is not proof of a valid cached document.
+      // Repair a broken/missing same-version cache instead of permanently skipping it.
+      JSONObject validCached=cached(context);
+      if(envelope.version<current && validCached!=null)return false;
+      if(envelope.version==current && validCached!=null)return false;
       // Keep the original exact signed payload: never reserialize before verification.
       JSONObject document=envelope.document;
       if(!CatalogSignature.verifyFull(document))
         throw new SecurityException("Published settings signature rejected by Config");
-      return prefs.edit().putInt("version",envelope.version)
-          .putString("signed_document",document.toString()).commit();
+      if(!prefs.edit().putInt("version",envelope.version)
+          .putString("signed_document",document.toString()).commit())
+        throw new IllegalStateException("SharedPreferences commit failed");
+      if(cached(context)==null)
+        throw new IllegalStateException("Signed publication was stored but cannot be verified on readback");
+      return true;
     }catch(Exception ex){
       android.util.Log.e("SupabaseConfigSync","Cannot cache signed publication",ex);
       throw new IllegalStateException("Cannot cache signed publication: "+ex.getMessage(),ex);
