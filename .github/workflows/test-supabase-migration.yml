@@ -2,6 +2,10 @@ name: TEST Supabase Migration APKs
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/test-supabase-migration.yml'
 
 permissions:
   contents: read
