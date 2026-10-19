@@ -168,7 +168,7 @@ jobs:
           import os
           from pathlib import Path
           key = os.environ['SUPABASE_PUBLISHABLE_KEY']
-          if not key.startswith('sb_publishable_') or not key.replace('_','').isalnum():
+          if not key.startswith('sb_publishable_') or not all(c.isalnum() or c in '_-' for c in key):
               raise SystemExit('Invalid Supabase publishable key')
           target = Path('app/src/main/java/com/calibre90/astestmob/SupabasePublicKey.java')
           target.write_text(
