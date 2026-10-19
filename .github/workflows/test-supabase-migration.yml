@@ -150,7 +150,18 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "Signing keystore validated"
 
+      - name: Verify Supabase public key is configured
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [[ "$SUPABASE_PUBLISHABLE_KEY" != sb_publishable_* ]]; then
+            echo "::error::Set repository Actions variable SUPABASE_PUBLISHABLE_KEY (public, not secret/service_role)"
+            exit 1
+          fi
+
       - name: Build both Android Release APKs
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
         run: gradle :app:assembleRelease :catalog-admin:assembleRelease -PbuildNumber=$((1000 + ${{ github.run_number }})) --stacktrace
 
       - name: Align and sign Release APKs using existing update certificate
