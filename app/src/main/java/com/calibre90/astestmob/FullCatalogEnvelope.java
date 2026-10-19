@@ -12,11 +12,13 @@ final class FullCatalogEnvelope {
   final int version;
   final String rawSnapshot;
   final JSONObject snapshot;
+  final JSONObject document;
 
-  private FullCatalogEnvelope(int version, String rawSnapshot, JSONObject snapshot) {
+  private FullCatalogEnvelope(int version, String rawSnapshot, JSONObject snapshot, JSONObject document) {
     this.version = version;
     this.rawSnapshot = rawSnapshot;
     this.snapshot = snapshot;
+    this.document = document;
   }
 
   static FullCatalogEnvelope parse(JSONObject document) throws Exception {
@@ -37,7 +39,7 @@ final class FullCatalogEnvelope {
     }
     JSONObject snapshot = new JSONObject(raw);
     AdminSnapshot.validate(snapshot);
-    return new FullCatalogEnvelope(version, raw, snapshot);
+    return new FullCatalogEnvelope(version, raw, snapshot, document);
   }
 
   String signingMessage() {
