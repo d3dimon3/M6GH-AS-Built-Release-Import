@@ -1,5 +1,7 @@
 name: TEST Supabase Migration APKs
 
+# Rebuild includes same-version cache repair (ccefb1f).
+
 on:
   workflow_dispatch:
   push:
