@@ -490,6 +490,12 @@ public class MainActivity extends Activity {
       });
       styleAdminHomeButton(publishOnline, "↑");
       adminHome.addView(publishOnline);
+      // Migration test only: preserve the existing GitHub publishing flow.
+      Button supabaseDraftTest=new Button(this);
+      supabaseDraftTest.setText("Supabase: отправить черновик (тест)");
+      supabaseDraftTest.setOnClickListener(v->SupabaseDraftDialog.show(this));
+      styleAdminHomeButton(supabaseDraftTest, "↑");
+      adminHome.addView(supabaseDraftTest);
       Button tokenSettings=new Button(this);
       tokenSettings.setText("Токен сервера: изменить / удалить");
       tokenSettings.setOnClickListener(v->{
