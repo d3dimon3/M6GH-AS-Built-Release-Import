@@ -56,6 +56,24 @@ final class FullCatalogSync {
     }
   }
 
+  /** Cache only an envelope already verified by SupabaseSignedCatalogReader. */
+  static boolean cacheVerified(Context context, FullCatalogEnvelope envelope) {
+    if(envelope==null)return false;
+    try{
+      SharedPreferences prefs=context.getApplicationContext().getSharedPreferences(STORE,Context.MODE_PRIVATE);
+      int current=prefs.getInt("version",0);
+      if(envelope.version<=current)return false;
+      // Keep the original exact signed payload: never reserialize before verification.
+      JSONObject document=envelope.document;
+      if(!CatalogSignature.verifyFull(document))return false;
+      return prefs.edit().putInt("version",envelope.version)
+          .putString("signed_document",document.toString()).commit();
+    }catch(Exception ex){
+      android.util.Log.e("SupabaseConfigSync","Cannot cache signed publication",ex);
+      return false;
+    }
+  }
+
   /** Verify the cached signature again before returning any published settings. */
   static JSONObject cached(Context context) {
     try {
