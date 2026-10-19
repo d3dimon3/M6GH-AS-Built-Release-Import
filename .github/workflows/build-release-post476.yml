@@ -1,4 +1,4 @@
-name: Build Release APKs (Post 476)
+name: Build Release APKs (Post 476) - D3
 on:
   workflow_dispatch:
 jobs:
