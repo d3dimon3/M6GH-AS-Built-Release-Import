@@ -11,6 +11,7 @@ import base64
 import json
 import os
 from pathlib import Path
+from validate_draft import validate_snapshot, InvalidDraft
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -24,16 +25,13 @@ def main():
     if args.version < 1:
         parser.error("version must be >=1")
     raw = Path(args.snapshot).read_text(encoding="utf-8")
-    if not raw or len(raw) > 262144:
+    if not raw or len(raw.encode("utf-8")) > 262144:
         parser.error("snapshot exceeds app size limit")
-    obj = json.loads(raw)
-    if not isinstance(obj, dict) or obj.get("schema") != 2 or obj.get("kind") != "mazda6gh-admin-settings":
-        parser.error("invalid snapshot envelope")
-    stores = obj.get("stores")
-    if not isinstance(stores, dict) or not all(isinstance(stores.get(k), dict) for k in ("run35_settings", "studio_admin_rows", "studio_custom_modules")):
-        parser.error("missing required stores")
-    # Full semantic validation is performed by Android AdminSnapshot.validate;
-    # server-side validation must be implemented before production publication.
+    try:
+        obj = json.loads(raw)
+        validate_snapshot(obj)
+    except (ValueError, InvalidDraft) as exc:
+        parser.error(f"invalid snapshot: {exc}")
     pem = os.environ.get("CATALOG_SIGNING_PRIVATE_KEY_PEM", "").replace("\\n", "\n").encode()
     if not pem:
         parser.error("missing signing key environment variable")
