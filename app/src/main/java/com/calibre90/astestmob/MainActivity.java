@@ -633,12 +633,21 @@ public class MainActivity extends Activity {
           return;
         }
         diagnostics.edit().remove("last_error").putInt("last_received_version",receivedVersion).apply();
-        if(!changed)return;
+        // A previously cached version may still need applying after Activity recreation.
+        // Reconcile the UI with the verified snapshot even if the version did not increase.
+        org.json.JSONObject verified=FullCatalogSync.cached(this);
+        if(verified==null){
+          Toast.makeText(this,"Config: версия "+receivedVersion+" получена, но локальная подпись/кэш недоступны",Toast.LENGTH_LONG).show();
+          return;
+        }
         refreshPublishedSplash();
         features.clear();
         features.addAll(StudioSettings.load(this));
         if(view!=null)view.invalidate();
-        Toast.makeText(this,"Config: настройки сервера обновлены, версия "+receivedVersion,Toast.LENGTH_LONG).show();
+        int publishedCount=features.size();
+        String success="Config: Supabase v"+receivedVersion+", функций "+publishedCount+(changed?" (обновлено)":" (проверено)");
+        android.util.Log.i("SupabaseConfigSync",success);
+        Toast.makeText(this,success,Toast.LENGTH_LONG).show();
       });
     },"MazdaSupabaseConfigSync").start();
   }
