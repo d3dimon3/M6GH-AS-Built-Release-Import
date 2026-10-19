@@ -3,7 +3,7 @@
 
 Required environment:
  SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CATALOG_SIGNING_PRIVATE_KEY_PEM
-Optional: PUBLISHER_DRAFT_ID (UUID). Without it, the oldest pending draft is used.
+Optional: PUBLISHER_DRAFT_ID (UUID). Without it, the newest pending draft for the current published version is used.
 
 The database RPC enforces atomic compare-and-swap and draft status transition.
 Do not run this in Android or put these credentials in the repository.
@@ -67,25 +67,27 @@ def main():
         if not os.environ.get(name):
             raise RuntimeError(f"Missing required secret: {name}")
 
+    rows = api("/rest/v1/app_config?id=eq.main&select=version&limit=1")
+    if not rows or len(rows) != 1:
+        raise RuntimeError("Publication row missing")
+    expected = int(rows[0]["version"])
+
     requested_id = os.environ.get("PUBLISHER_DRAFT_ID")
     if requested_id:
         requested_id = str(UUID(requested_id))
         filter_expr = "id=eq." + urllib.parse.quote(requested_id)
     else:
-        filter_expr = "status=eq.pending"
+        # Do not let obsolete pending drafts block newer, valid Admin changes.
+        # Select the newest draft targeting the current published version.
+        filter_expr = "status=eq.pending&base_version=eq." + str(expected)
     drafts = api("/rest/v1/admin_config_drafts?select=id,base_version,snapshot,status&" +
-                 filter_expr + "&order=created_at.asc&limit=1")
+                 filter_expr + "&order=created_at.desc&limit=1")
     if not drafts:
-        print("No draft to publish")
+        print(f"No eligible pending draft for published version {expected}")
         return
     draft = drafts[0]
     if draft["status"] != "pending":
         raise RuntimeError("Draft is not pending")
-
-    rows = api("/rest/v1/app_config?id=eq.main&select=version&limit=1")
-    if not rows or len(rows) != 1:
-        raise RuntimeError("Publication row missing")
-    expected = int(rows[0]["version"])
     if int(draft["base_version"]) != expected:
         raise RuntimeError("Draft is stale; refusing to overwrite newer publication")
 
