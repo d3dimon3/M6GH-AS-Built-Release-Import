@@ -153,6 +153,28 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "Signing keystore validated"
 
+      - name: Generate shared Supabase public-key class for Config and Admin compilation
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          key = os.environ['SUPABASE_PUBLISHABLE_KEY']
+          if not key.startswith('sb_publishable_') or not key.replace('_','').isalnum():
+              raise SystemExit('Invalid Supabase publishable key')
+          target = Path('app/src/main/java/com/calibre90/astestmob/SupabasePublicKey.java')
+          target.write_text(
+              'package com.calibre90.astestmob;\n'
+              'final class SupabasePublicKey {\n'
+              '  static final String VALUE = "' + key + '";\n'
+              '  private SupabasePublicKey() {}\n'
+              '}\n'
+          )
+          print('Generated public-key source for both modules')
+          PY
+
       - name: Build both Android Release APKs
         run: gradle :app:assembleRelease :catalog-admin:assembleRelease -PbuildNumber=$((1000 + ${{ github.run_number }})) --stacktrace
 
