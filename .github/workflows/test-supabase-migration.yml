@@ -178,6 +178,9 @@ jobs:
           print('Generated public-key source for both modules')
           PY
 
+      - name: Install public signature verifier
+        run: python3 -m pip install --disable-pip-version-check cryptography
+
       - name: Diagnose public Supabase publication visibility and RSA signature
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
@@ -213,7 +216,7 @@ jobs:
           from cryptography.hazmat.primitives import hashes, serialization
           from cryptography.hazmat.primitives.asymmetric import padding
           key = serialization.load_der_public_key(base64.b64decode(match.group(1)))
-          message = ('MAZDA6GH-SETTINGS-V2\\n' + str(doc['version']) + '\\n' + doc['snapshot_payload']).encode()
+          message = ('MAZDA6GH-SETTINGS-V2\n' + str(doc['version']) + '\n' + doc['snapshot_payload']).encode()
           key.verify(base64.b64decode(doc['signature']), message, padding.PKCS1v15(), hashes.SHA256())
           print('RSA signature: VERIFIED against Config APK public key')
           snapshot = json.loads(doc['snapshot_payload'])
