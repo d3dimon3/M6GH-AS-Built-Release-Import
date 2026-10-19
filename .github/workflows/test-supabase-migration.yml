@@ -167,14 +167,17 @@ jobs:
           python3 - <<'PY'
           import os
           from pathlib import Path
-          key = os.environ['SUPABASE_PUBLISHABLE_KEY']
-          if not key.startswith('sb_publishable_') or not all(c.isalnum() or c in '_-' for c in key):
-              raise SystemExit('Invalid Supabase publishable key')
+          key = os.environ['SUPABASE_PUBLISHABLE_KEY'].strip()
+          if not key.startswith('sb_publishable_') or len(key) < 20:
+              raise SystemExit('Missing or invalid Supabase publishable key')
+          # Encode as a Java string literal safely, without printing the key.
+          import json
+          literal = json.dumps(key)
           target = Path('app/src/main/java/com/calibre90/astestmob/SupabasePublicKey.java')
           target.write_text(
               'package com.calibre90.astestmob;\n'
               'final class SupabasePublicKey {\n'
-              '  static final String VALUE = "' + key + '";\n'
+              '  static final String VALUE = ' + literal + ';\n'
               '  private SupabasePublicKey() {}\n'
               '}\n'
           )
