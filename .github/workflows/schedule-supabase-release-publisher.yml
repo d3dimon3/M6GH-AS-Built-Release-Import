@@ -1,0 +1,39 @@
+name: Schedule Supabase Release Publisher
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-release-publisher
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout release branch only
+        uses: actions/checkout@v4
+        with:
+          ref: release-supabase-v1
+          persist-credentials: false
+      - name: Install signing dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography
+      - name: Validate release publisher credentials
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CATALOG_SIGNING_PRIVATE_KEY_PEM: ${{ secrets.CATALOG_SIGNING_PRIVATE_KEY_PEM }}
+        run: |
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "::error::Missing SUPABASE_SERVICE_ROLE_KEY"; exit 1; }
+          test -n "$CATALOG_SIGNING_PRIVATE_KEY_PEM" || { echo "::error::Missing CATALOG_SIGNING_PRIVATE_KEY_PEM"; exit 1; }
+      - name: Publish latest release draft
+        env:
+          SUPABASE_URL: https://zyksvoauffhexketcyrq.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CATALOG_SIGNING_PRIVATE_KEY_PEM: ${{ secrets.CATALOG_SIGNING_PRIVATE_KEY_PEM }}
+        run: python3 supabase/tools/publish_pending_draft.py
