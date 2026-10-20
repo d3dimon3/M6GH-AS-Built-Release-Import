@@ -1158,13 +1158,16 @@ public class MainActivity extends Activity {
       txtFit(c,enabled?"ABT загружен — выберите функции":
           "Загрузите ABT, чтобы включить функции",20,332,12,
           enabled?Color.rgb(64,94,74):Color.DKGRAY,355);
-      int slots=10;
-      if(page<0||page>=items.size())page=0;
+      // Keep six compact rows visible and scroll the complete feature list vertically.
+      int slots=12;
+      int maxPage=Math.max(0,((items.size()-1)/2-5)*2);
+      page=Math.max(0,Math.min(page,maxPage));
+      c.save();c.clipRect(17,345,383,712);
       for(int i=0;i<slots&&page+i<items.size();i++){
         FeatureEngine.Feature feature=items.get(page+i);
-        float x=18+(i%2)*187f,y=350+(i/2)*65f;
+        float x=18+(i%2)*187f,y=350+(i/2)*60f;
         float fw=featureDimension("feature_card_width",177,100,180);
-        float fh=featureDimension("feature_card_height",57,32,63);
+        float fh=Math.min(52,featureDimension("feature_card_height",48,32,63));
         card(c,x,y,fw,fh,10,false);
         float bx=x+12,by=y+(fh-23)/2;
         card(c,bx,by,23,23,4,false);
@@ -1177,7 +1180,14 @@ public class MainActivity extends Activity {
         }
         txtFit(c,feature.label,bx+29,y+fh/2+5,12,enabled?Color.BLACK:Color.GRAY,Math.max(30,fw-51));
       }
-      if(items.size()>slots)txt(c,"Следующие функции  ›",225,698,12,Color.rgb(150,0,0),true);
+      c.restore();
+      if(items.size()>slots){
+        float track=365f,visible=Math.min(1f,12f/items.size());
+        float thumb=Math.max(24f,track*visible);
+        float position=maxPage==0?0:(track-thumb)*page/maxPage;
+        rect(c,Color.rgb(211,215,222),386,347,3,track,2);
+        rect(c,Color.rgb(160,49,55),386,347+position,3,thumb,2);
+      }
     }
     ArrayList<FeatureEngine.Feature> customFeatures(int module){
       ArrayList<FeatureEngine.Feature> result=new ArrayList<>();
@@ -1277,10 +1287,27 @@ public class MainActivity extends Activity {
       actual.restore();
     }
     float startY,startX,moduleTabOffset=0;
+    int scrollFeaturePage(){
+      if(active>=4){org.json.JSONObject item=customModuleCatalog().optJSONObject(active-4);
+        return item==null?0:customFeaturePage.getOrDefault(item.optString("id"),0);}
+      return featurePage[active];
+    }
+    void scrollFeatures(int deltaRows){
+      ArrayList<FeatureEngine.Feature> list=active>=4?customFeatures(active):moduleFeatures(active);
+      int max=Math.max(0,((list.size()-1)/2-5)*2);
+      int next=Math.max(0,Math.min(max,scrollFeaturePage()+deltaRows*2));
+      if(active>=4){org.json.JSONObject item=customModuleCatalog().optJSONObject(active-4);
+        if(item!=null){String id=item.optString("id");customFeaturePage.put(id,next);saveCustomTabPosition(id);}}
+      else featurePage[active]=next;
+      invalidate();
+    }
     void revealActiveTab(){moduleTabOffset=0;}
     @Override public boolean onTouchEvent(MotionEvent e){if(e.getAction()==MotionEvent.ACTION_DOWN){startY=e.getY()/sy;startX=e.getX()/sx;return true;}if(e.getAction()!=MotionEvent.ACTION_UP)return true;float x=e.getX()/sx,y=e.getY()/sy;
-      // Feature cards use taps, not the former HEX-row swipe scrolling.
-      if(startY>=350&&startY<=713&&Math.abs(y-startY)>18)return true;
+      // Swipe only inside the feature viewport; ABT buttons below remain separate.
+      if(startY>=345&&startY<=712&&Math.abs(y-startY)>16){
+        scrollFeatures(Math.round((startY-y)/60f)==0?(startY>y?1:-1):Math.round((startY-y)/60f));
+        return true;
+      }
       if(y>=127&&y<=183){
         int count=visibleTabCount();
         float width=370f/Math.max(1,count);
@@ -1301,29 +1328,16 @@ public class MainActivity extends Activity {
         boolean ready=active>=4?getSharedPreferences("studio_custom_abt_loaded",MODE_PRIVATE)
           .getBoolean(customModuleCatalog().optJSONObject(active-4).optString("id"),false):loaded[active];
         if(!ready){Toast.makeText(MainActivity.this,"Сначала откройте ABT этого блока",Toast.LENGTH_SHORT).show();return true;}
-        if(y>=676){
-          if(active>=4){
-            String id=customModuleCatalog().optJSONObject(active-4).optString("id");
-            int count=customFeatures(active).size(),old=customFeaturePage.getOrDefault(id,0);
-            customFeaturePage.put(id,old+10>=count?0:old+10);saveCustomTabPosition(id);
-          }else{
-            int count=moduleFeatures(active).size();
-            featurePage[active]=featurePage[active]+10>=count?0:featurePage[active]+10;
-          }
-          invalidate();return true;
-        }
-        int col=x>=205?1:0,row=(int)((y-350)/65f);
-        if(row>=0&&row<5){
-          int slot=row*2+col;
-          if(active>=4){
-            String id=customModuleCatalog().optJSONObject(active-4).optString("id");
-            toggleCustomFeature(customFeaturePage.getOrDefault(id,0)+slot);
-          }else toggleFeature(featurePage[active]+slot);
+        int col=x>=205?1:0,row=(int)((y-350)/60f);
+        if(row>=0&&row<6&&x>=18&&x<=385&&y>=350+row*60f&&y<=350+row*60f+52){
+          int slot=scrollFeaturePage()+row*2+col;
+          if(active>=4)toggleCustomFeature(slot);
+          else toggleFeature(slot);
         }
         return true;
       }
       if(active>=4){
-        if(y>=717&&y<=777){
+        if(y>=720&&y<=772&&((x>=10&&x<=195)||(x>=205&&x<=390))){
           org.json.JSONObject item=customModuleCatalog().optJSONObject(active-4);
           if(item!=null)customAbtPicker(x>=200,item.optString("id"));
           return true;
@@ -1332,7 +1346,7 @@ public class MainActivity extends Activity {
         if(y>=779&&x>=336){about();return true;}
         return true;
       }
-      if(y>=717&&y<=777){if(x<200)open();else save();return true;}
+      if(y>=720&&y<=772){if(x>=10&&x<=195)open();else if(x>=205&&x<=390)save();return true;}
       if(y>=779){if(x>=336)about();else if(x>=277)StudioFaq.show(MainActivity.this);return true;}
       return true;
     }
