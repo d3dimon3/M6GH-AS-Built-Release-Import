@@ -118,6 +118,11 @@ jobs:
       - name: Validate FAQ publication schema regression tests
         run: python3 tools/test_faq_snapshot.py
 
+      - name: Verify release Supabase publisher scripts compile
+        run: |
+          python3 -m py_compile supabase/tools/publish_pending_draft.py supabase/tools/validate_draft.py
+          python3 supabase/tools/test_validate_draft.py
+
       - name: Run ABT and feature engine regression tests
         run: |
           mkdir -p /tmp/abt-test-classes
