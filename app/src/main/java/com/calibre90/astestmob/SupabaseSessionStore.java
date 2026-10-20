@@ -33,7 +33,7 @@ final class SupabaseSessionStore {
   }
   static boolean hasSession(Context c){return prefs(c).contains("iv")&&prefs(c).contains("data");}
   static void save(Context c,String refreshToken) throws Exception {
-    if(refreshToken==null||refreshToken.length()<16)throw new SecurityException("Invalid refresh token");
+    if(refreshToken==null||refreshToken.trim().isEmpty())throw new SecurityException("Missing refresh token");
     Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");
     cipher.init(Cipher.ENCRYPT_MODE,key(true));
     byte[] data=cipher.doFinal(refreshToken.getBytes(StandardCharsets.UTF_8));
