@@ -422,110 +422,12 @@ public class MainActivity extends Activity {
       });
       styleAdminHomeButton(restoreBackup, "↓");
       adminHome.addView(restoreBackup);
-      Button publishOnline=new Button(this);
-      publishOnline.setText("Отправить настройки на сервер");
-      publishOnline.setOnClickListener(v->{
-        try{
-          org.json.JSONObject snapshot=AdminSnapshot.exportLocal(this);
-          AdminSnapshot.validate(snapshot);
-          final boolean saved=GitHubTokenStore.hasToken(this);
-          final EditText tokenInput=new EditText(this);
-          tokenInput.setSingleLine(true);
-          tokenInput.setHint("Токен доступа к серверу (GitHub)");
-          tokenInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-          new AlertDialog.Builder(this)
-            .setTitle("Отправить на сервер")
-            .setMessage(saved
-              ?"Использовать сохранённый зашифрованный токен? Для замены или удаления нажмите «Токен сервера» на главном экране. Настройки сначала отправятся на проверку."
-              :"Введите токен сервера (GitHub) с правами Contents и Actions: Read and write. После успешной отправки он будет сохранён в зашифрованном виде на этом устройстве. Настройки сначала отправятся на проверку.")
-            .setView(saved?null:tokenInput)
-            .setNegativeButton("Отмена",null)
-            .setPositiveButton("Отправить",(d,w)->{
-              final String token;
-              try{
-                token=saved?GitHubTokenStore.load(this):tokenInput.getText().toString().trim();
-                if(token==null||token.length()<12)throw new IllegalArgumentException("Введите действительный токен");
-              }catch(Exception ex){
-                Toast.makeText(this,"Токен: "+ex.getMessage(),Toast.LENGTH_LONG).show();
-                return;
-              }
-              tokenInput.setText("");
-              new Thread(()->{
-                try{
-                  // Automatically obtain the signed server configuration, preserving
-                  // server-only settings while applying this admin's edited values.
-                  FullCatalogEnvelope current=AdminOnlineRestore.download(token);
-                  android.content.SharedPreferences syncPrefs=
-                      getSharedPreferences("studio_admin_sync",MODE_PRIVATE);
-                  String baseline=syncPrefs.getString("last_synced_snapshot",null);
-                  int knownVersion=syncPrefs.getInt("restored_publication_version",0);
-                  if(baseline==null || knownVersion<=0)
-                    throw new IllegalStateException("Нет исходной синхронизированной версии. "+
-                      "Сохраните экспорт настроек и выполните первое восстановление с сервера.");
-                  org.json.JSONObject base=new org.json.JSONObject(baseline);
-                  org.json.JSONObject merged=AdminThreeWayMerge.merge(base,snapshot,current.snapshot);
-                  String sha=GitHubSnapshotUploader.upload(merged,token,current.snapshot);
-                  if(!saved){
-                    try{GitHubTokenStore.save(this,token);}
-                    catch(Exception storeError){
-                      runOnUiThread(()->Toast.makeText(this,
-                        "Отправлено, но токен не сохранён: "+storeError.getMessage(),Toast.LENGTH_LONG).show());
-                    }
-                  }
-                  // Request signed publication automatically after successful upload.
-                  GitHubSnapshotUploader.requestRelease(token,sha);
-                  runOnUiThread(()->new AlertDialog.Builder(this)
-                    .setTitle("Настройки отправлены")
-                    .setMessage("Изменения загружены на сервер, выпуск подписанной конфигурации запрошен автоматически. "+
-                      "M6GH AS-BUILT CONFIG получит их после успешного завершения публикации.")
-                    .setPositiveButton("Закрыть",null).show());
-                }catch(Exception ex){
-                  runOnUiThread(()->Toast.makeText(this,"Сервер: "+ex.getMessage(),Toast.LENGTH_LONG).show());
-                }
-              },"AdminGitHubUpload").start();
-            }).show();
-        }catch(Exception ex){
-          Toast.makeText(this,"Ошибка подготовки: "+ex.getMessage(),Toast.LENGTH_LONG).show();
-        }
-      });
-      styleAdminHomeButton(publishOnline, "↑");
-      adminHome.addView(publishOnline);
-      // Migration test only: preserve the existing GitHub publishing flow.
-      Button supabaseDraftTest=new Button(this);
-      supabaseDraftTest.setText("Supabase: отправить черновик (тест)");
-      supabaseDraftTest.setOnClickListener(v->SupabaseDraftDialog.show(this));
-      styleAdminHomeButton(supabaseDraftTest, "↑");
-      adminHome.addView(supabaseDraftTest);
-      Button tokenSettings=new Button(this);
-      tokenSettings.setText("Токен сервера: изменить / удалить");
-      tokenSettings.setOnClickListener(v->{
-        final EditText replacement=new EditText(this);
-        replacement.setSingleLine(true);
-        replacement.setHint("Новый токен сервера");
-        replacement.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        new AlertDialog.Builder(this)
-          .setTitle("Токен сервера")
-          .setMessage(GitHubTokenStore.hasToken(this)
-            ?"Токен сохранён в зашифрованном виде. Можно заменить или удалить его."
-            :"Токен пока не сохранён. Введите его для будущих отправок.")
-          .setView(replacement)
-          .setNegativeButton("Отмена",null)
-          .setNeutralButton("Удалить",(dialog,which)->{
-            GitHubTokenStore.clear(this);
-            Toast.makeText(this,"Токен удалён с устройства",Toast.LENGTH_SHORT).show();
-          })
-          .setPositiveButton("Сохранить",(dialog,which)->{
-            try{
-              GitHubTokenStore.save(this,replacement.getText().toString());
-              replacement.setText("");
-              Toast.makeText(this,"Токен защищённо сохранён",Toast.LENGTH_SHORT).show();
-            }catch(Exception ex){
-              Toast.makeText(this,"Ошибка токена: "+ex.getMessage(),Toast.LENGTH_LONG).show();
-            }
-          }).show();
-      });
-      styleAdminHomeButton(tokenSettings, "◆");
-      adminHome.addView(tokenSettings);
+       // Supabase is the only server submission path.
+       Button supabasePublish=new Button(this);
+       supabasePublish.setText("Отправить настройки на сервер");
+       supabasePublish.setOnClickListener(v->SupabaseDraftDialog.show(this));
+       styleAdminHomeButton(supabasePublish, "↑");
+       adminHome.addView(supabasePublish);
       adminRoot.addView(adminHome,new FrameLayout.LayoutParams(-1,-1));
       setContentView(adminRoot);
       // The old automatic showAdminTabs() hid the home screen immediately.
@@ -627,7 +529,7 @@ public class MainActivity extends Activity {
         if(failure!=null){
           // Surface the actual cause once, not on every 60-second poll.
           if(!failure.equals(diagnostics.getString("last_error",""))){
-            Toast.makeText(this,"Config: ошибка загрузки Supabase: "+failure,Toast.LENGTH_LONG).show();
+            android.util.Log.w("SupabaseConfigSync","Background refresh failed: "+failure);
           }
           diagnostics.edit().putString("last_error",failure).apply();
           return;
@@ -637,7 +539,7 @@ public class MainActivity extends Activity {
         // Reconcile the UI with the verified snapshot even if the version did not increase.
         org.json.JSONObject verified=FullCatalogSync.cached(this);
         if(verified==null){
-          Toast.makeText(this,"Config: версия "+receivedVersion+" получена, но локальная подпись/кэш недоступны",Toast.LENGTH_LONG).show();
+          android.util.Log.w("SupabaseConfigSync","Signed publication unavailable in cache for v"+receivedVersion);
           return;
         }
         refreshPublishedSplash();
@@ -647,7 +549,7 @@ public class MainActivity extends Activity {
         int publishedCount=features.size();
         String success="Config: Supabase v"+receivedVersion+", функций "+publishedCount+(changed?" (обновлено)":" (проверено)");
         android.util.Log.i("SupabaseConfigSync",success);
-        Toast.makeText(this,success,Toast.LENGTH_LONG).show();
+        // Silent background sync.
       });
     },"MazdaSupabaseConfigSync").start();
   }
@@ -1888,19 +1790,7 @@ public class MainActivity extends Activity {
       }catch(Exception ignored){}
       TextView versionInfo=caption("◉  Версия: "+appVersion,10,Color.rgb(98,106,116),false);
       place(root,versionInfo,.095f,.835f,.78f,.030f,width,height);
-      // Permanent diagnostic: a short Toast is too easy to miss during startup.
-      android.content.SharedPreferences syncState=getSharedPreferences("studio_supabase_diagnostics",MODE_PRIVATE);
-      org.json.JSONObject verifiedSnapshot=FullCatalogSync.cached(this);
-      int cachedVersion=getSharedPreferences("studio_published_full_catalog",MODE_PRIVATE).getInt("version",0);
-      String lastError=syncState.getString("last_error","");
-      String syncLabel=verifiedSnapshot!=null
-          ? "Supabase: v"+cachedVersion+" • функций "+StudioSettings.published(this).size()
-          : "Supabase: нет проверенных настроек";
-      if(!lastError.isEmpty())syncLabel+=" • ошибка: "+lastError;
-      TextView syncInfo=caption(syncLabel,9,lastError.isEmpty()?Color.rgb(58,98,80):Color.rgb(190,35,45),false);
-      syncInfo.setMaxLines(3);
-      syncInfo.setOnClickListener(v->refreshPublishedCatalog());
-      place(root,syncInfo,.095f,.858f,.82f,.045f,width,height);
+
 
 
       TextView ok=caption("Закрыть",16,Color.WHITE,true);ok.setGravity(Gravity.CENTER);
