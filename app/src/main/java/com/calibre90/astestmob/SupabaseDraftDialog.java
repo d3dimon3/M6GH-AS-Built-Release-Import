@@ -21,60 +21,81 @@ final class SupabaseDraftDialog {
   private static final String URL_BASE = "https://zyksvoauffhexketcyrq.supabase.co";
   private SupabaseDraftDialog() {}
 
+  /** Send pending draft; the trusted server signs and publishes separately. */
   static void show(Activity activity) {
-    LinearLayout fields = new LinearLayout(activity);
+    if(SupabaseSessionStore.hasSession(activity)){
+      submit(activity,null,null);
+      return;
+    }
+    showLogin(activity);
+  }
+
+  private static void showLogin(Activity activity) {
+    LinearLayout fields=new LinearLayout(activity);
     fields.setOrientation(LinearLayout.VERTICAL);
-    int pad = (int)(16 * activity.getResources().getDisplayMetrics().density);
-    fields.setPadding(pad, pad, pad, 0);
-    TextView note = new TextView(activity);
-    note.setText("Тестовая отправка черновика. Настройки НЕ публикуются для Config. Используйте только публичный ключ sb_publishable_, НЕ secret/service_role.");
+    int pad=(int)(16*activity.getResources().getDisplayMetrics().density);
+    fields.setPadding(pad,pad,pad,0);
+    TextView note=new TextView(activity);
+    note.setText("Войдите один раз. Сессия сохранится в защищённом хранилище Android. При выходе из аккаунта или истечении сессии потребуется повторный вход.");
     fields.addView(note);
-    EditText key = new EditText(activity);
-    key.setHint("Supabase publishable key (sb_publishable_...)");
-    key.setSingleLine(true);
-    fields.addView(key);
-    EditText email = new EditText(activity);
+    EditText email=new EditText(activity);
     email.setHint("Email администратора");
-    email.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+    email.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
     fields.addView(email);
-    EditText password = new EditText(activity);
+    EditText password=new EditText(activity);
     password.setHint("Пароль администратора");
-    password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+    password.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
     fields.addView(password);
     new AlertDialog.Builder(activity)
-      .setTitle("Supabase — тест черновика")
+      .setTitle("Вход администратора Supabase")
       .setView(fields)
-      .setNegativeButton("Отмена", null)
-      .setPositiveButton("Отправить черновик", (dialog, which) -> {
-        final String publicKey = key.getText().toString().trim();
-        final String mail = email.getText().toString().trim();
-        final String pass = password.getText().toString();
+      .setNegativeButton("Отмена",null)
+      .setPositiveButton("Войти и отправить",(d,w)->{
+        String mail=email.getText().toString().trim();
+        String pass=password.getText().toString();
         password.setText("");
-        key.setText("");
-        new Thread(() -> {
-          try {
-            JSONObject snapshot = AdminSnapshot.exportLocal(activity);
-            AdminSnapshot.validate(snapshot);
-            SupabaseAdminAuth.Session session =
-              SupabaseAdminAuth.signIn(URL_BASE, publicKey, mail, pass);
-            // Get current public version. The database RLS policy enforces it again
-            // at insert time, preventing stale drafts from silently overwriting.
-            long baseVersion = readVersion(publicKey);
-            String id = SupabaseAdminDraftTransport.submit(
-              URL_BASE, publicKey, session.accessToken, snapshot, baseVersion);
-            activity.runOnUiThread(() -> new AlertDialog.Builder(activity)
-              .setTitle("Черновик принят")
-              .setMessage("Черновик ID: " + id +
-                "\nНастройки ещё НЕ опубликованы. Config не получит их до серверной проверки и RSA-подписи.")
-              .setPositiveButton("Закрыть", null).show());
-          } catch (Exception ex) {
-            activity.runOnUiThread(() -> new AlertDialog.Builder(activity)
-              .setTitle("Ошибка отправки Supabase")
-              .setMessage(ex.getMessage())
-              .setPositiveButton("Закрыть", null).show());
-          }
-        }, "SupabaseDraftTest").start();
+        submit(activity,mail,pass);
       }).show();
+  }
+
+  private static void submit(Activity activity,String mail,String pass) {
+    final String publicKey=SupabasePublicKey.VALUE;
+    new Thread(()->{
+      try{
+        JSONObject snapshot=AdminSnapshot.exportLocal(activity);
+        AdminSnapshot.validate(snapshot);
+        SupabaseAdminAuth.Session session;
+        if(mail!=null){
+          session=SupabaseAdminAuth.signIn(URL_BASE,publicKey,mail,pass);
+        }else{
+          String saved=SupabaseSessionStore.load(activity);
+          session=SupabaseAdminAuth.refresh(URL_BASE,publicKey,saved);
+        }
+        // Supabase rotates refresh tokens on renewal: persist the new token
+        // before making the submission, so future sends remain authenticated.
+        SupabaseSessionStore.save(activity,session.refreshToken);
+        long baseVersion=readVersion(publicKey);
+        String id=SupabaseAdminDraftTransport.submit(
+          URL_BASE,publicKey,session.accessToken,snapshot,baseVersion);
+        activity.runOnUiThread(()->new AlertDialog.Builder(activity)
+          .setTitle("Настройки отправлены на сервер")
+          .setMessage("Черновик ID: "+id+
+            "\\nНастройки переданы на проверку. Config получит их после серверной публикации и RSA-подписи.")
+          .setPositiveButton("Закрыть",null).show());
+      }catch(Exception ex){
+        final String message=ex.getMessage()==null?ex.toString():ex.getMessage();
+        boolean authExpired=mail==null&&(message.contains("Auth HTTP 4")||
+          message.contains("Keystore")||message.contains("refresh token")||
+          message.contains("AEADBadTag")||message.contains("Signature/MAC"));
+        if(authExpired)SupabaseSessionStore.clear(activity);
+        activity.runOnUiThread(()->new AlertDialog.Builder(activity)
+          .setTitle(authExpired?"Требуется повторный вход":"Ошибка отправки Supabase")
+          .setMessage(authExpired?"Сохранённая сессия истекла или недоступна. Войдите повторно.":message)
+          .setPositiveButton(authExpired?"Войти":"Закрыть",(d,w)->{
+            if(authExpired)showLogin(activity);
+          }).show());
+      }
+    },"SupabaseAdminSubmit").start();
   }
 
   private static long readVersion(String publishableKey) throws Exception {
