@@ -1158,16 +1158,16 @@ public class MainActivity extends Activity {
       txtFit(c,enabled?"ABT загружен — выберите функции":
           "Загрузите ABT, чтобы включить функции",20,332,12,
           enabled?Color.rgb(64,94,74):Color.DKGRAY,355);
-      // Keep six compact rows visible and scroll the complete feature list vertically.
-      int slots=12;
-      int maxPage=Math.max(0,((items.size()-1)/2-5)*2);
+      // Eight compact rows per column, with vertical scrolling for longer lists.
+      int slots=16;
+      int maxPage=Math.max(0,((items.size()-1)/2-7)*2);
       page=Math.max(0,Math.min(page,maxPage));
       c.save();c.clipRect(17,345,383,712);
       for(int i=0;i<slots&&page+i<items.size();i++){
         FeatureEngine.Feature feature=items.get(page+i);
-        float x=18+(i%2)*187f,y=350+(i/2)*60f;
+        float x=18+(i%2)*187f,y=350+(i/2)*45f;
         float fw=featureDimension("feature_card_width",177,100,180);
-        float fh=Math.min(52,featureDimension("feature_card_height",48,32,63));
+        float fh=Math.min(39,featureDimension("feature_card_height",39,32,63));
         card(c,x,y,fw,fh,10,false);
         float bx=x+12,by=y+(fh-23)/2;
         card(c,bx,by,23,23,4,false);
@@ -1182,7 +1182,7 @@ public class MainActivity extends Activity {
       }
       c.restore();
       if(items.size()>slots){
-        float track=365f,visible=Math.min(1f,12f/items.size());
+        float track=365f,visible=Math.min(1f,16f/items.size());
         float thumb=Math.max(24f,track*visible);
         float position=maxPage==0?0:(track-thumb)*page/maxPage;
         rect(c,Color.rgb(211,215,222),386,347,3,track,2);
@@ -1294,7 +1294,7 @@ public class MainActivity extends Activity {
     }
     void scrollFeatures(int deltaRows){
       ArrayList<FeatureEngine.Feature> list=active>=4?customFeatures(active):moduleFeatures(active);
-      int max=Math.max(0,((list.size()-1)/2-5)*2);
+      int max=Math.max(0,((list.size()-1)/2-7)*2);
       int next=Math.max(0,Math.min(max,scrollFeaturePage()+deltaRows*2));
       if(active>=4){org.json.JSONObject item=customModuleCatalog().optJSONObject(active-4);
         if(item!=null){String id=item.optString("id");customFeaturePage.put(id,next);saveCustomTabPosition(id);}}
@@ -1305,7 +1305,7 @@ public class MainActivity extends Activity {
     @Override public boolean onTouchEvent(MotionEvent e){if(e.getAction()==MotionEvent.ACTION_DOWN){startY=e.getY()/sy;startX=e.getX()/sx;return true;}if(e.getAction()!=MotionEvent.ACTION_UP)return true;float x=e.getX()/sx,y=e.getY()/sy;
       // Swipe only inside the feature viewport; ABT buttons below remain separate.
       if(startY>=345&&startY<=712&&Math.abs(y-startY)>16){
-        scrollFeatures(Math.round((startY-y)/60f)==0?(startY>y?1:-1):Math.round((startY-y)/60f));
+        scrollFeatures(Math.round((startY-y)/45f)==0?(startY>y?1:-1):Math.round((startY-y)/45f));
         return true;
       }
       if(y>=127&&y<=183){
@@ -1328,8 +1328,8 @@ public class MainActivity extends Activity {
         boolean ready=active>=4?getSharedPreferences("studio_custom_abt_loaded",MODE_PRIVATE)
           .getBoolean(customModuleCatalog().optJSONObject(active-4).optString("id"),false):loaded[active];
         if(!ready){Toast.makeText(MainActivity.this,"Сначала откройте ABT этого блока",Toast.LENGTH_SHORT).show();return true;}
-        int col=x>=205?1:0,row=(int)((y-350)/60f);
-        if(row>=0&&row<6&&x>=18&&x<=385&&y>=350+row*60f&&y<=350+row*60f+52){
+        int col=x>=205?1:0,row=(int)((y-350)/45f);
+        if(row>=0&&row<8&&x>=18&&x<=385&&y>=350+row*45f&&y<=350+row*45f+39){
           int slot=scrollFeaturePage()+row*2+col;
           if(active>=4)toggleCustomFeature(slot);
           else toggleFeature(slot);
