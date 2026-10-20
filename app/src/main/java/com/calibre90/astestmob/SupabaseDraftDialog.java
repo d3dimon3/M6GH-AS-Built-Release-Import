@@ -24,7 +24,12 @@ final class SupabaseDraftDialog {
   /** Send pending draft; the trusted server signs and publishes separately. */
   static void show(Activity activity) {
     if(SupabaseSessionStore.hasSession(activity)){
-      submit(activity,null,null);
+      new AlertDialog.Builder(activity)
+        .setTitle("Отправить настройки на сервер?")
+        .setMessage("Текущие настройки будут отправлены в Supabase на проверку и публикацию.")
+        .setNegativeButton("Отмена",null)
+        .setPositiveButton("Отправить",(d,w)->submit(activity,null,null))
+        .show();
       return;
     }
     showLogin(activity);
@@ -67,13 +72,20 @@ final class SupabaseDraftDialog {
         SupabaseAdminAuth.Session session;
         if(mail!=null){
           session=SupabaseAdminAuth.signIn(URL_BASE,publicKey,mail,pass);
+          // Persist the first successful sign-in before any later network step.
+          SupabaseSessionStore.save(activity,session.refreshToken);
         }else{
           String saved=SupabaseSessionStore.load(activity);
-          session=SupabaseAdminAuth.refresh(URL_BASE,publicKey,saved);
+          try{
+            session=SupabaseAdminAuth.refresh(URL_BASE,publicKey,saved);
+          }catch(SecurityException expired){
+            // An invalidated refresh token cannot be reused. Clear it and
+            // request a fresh sign-in; do not loop with the stale token.
+            SupabaseSessionStore.clear(activity);
+            throw new SessionExpiredException("Сессия Supabase больше не действительна",expired);
+          }
+          SupabaseSessionStore.save(activity,session.refreshToken);
         }
-        // Supabase rotates refresh tokens on renewal: persist the new token
-        // before making the submission, so future sends remain authenticated.
-        SupabaseSessionStore.save(activity,session.refreshToken);
         long baseVersion=readVersion(publicKey);
         String id=SupabaseAdminDraftTransport.submit(
           URL_BASE,publicKey,session.accessToken,snapshot,baseVersion);
@@ -84,7 +96,7 @@ final class SupabaseDraftDialog {
           .setPositiveButton("Закрыть",null).show());
       }catch(Exception ex){
         final String message=ex.getMessage()==null?ex.toString():ex.getMessage();
-        boolean authExpired=mail==null&&(message.contains("Auth HTTP 4")||
+        boolean authExpired=mail==null&&(ex instanceof SessionExpiredException||
           message.contains("Keystore")||message.contains("refresh token")||
           message.contains("AEADBadTag")||message.contains("Signature/MAC"));
         if(authExpired)SupabaseSessionStore.clear(activity);
@@ -96,6 +108,10 @@ final class SupabaseDraftDialog {
           }).show());
       }
     },"SupabaseAdminSubmit").start();
+  }
+
+  private static final class SessionExpiredException extends SecurityException {
+    SessionExpiredException(String message,Throwable cause){super(message,cause);}
   }
 
   private static long readVersion(String publishableKey) throws Exception {
