@@ -80,7 +80,7 @@ final class SupabaseDraftDialog {
         activity.runOnUiThread(()->new AlertDialog.Builder(activity)
           .setTitle("Настройки отправлены на сервер")
           .setMessage("Черновик ID: "+id+
-            "\\nНастройки переданы на проверку. Config получит их после серверной публикации и RSA-подписи.")
+            "\nНастройки переданы на проверку. Config получит их после серверной публикации и RSA-подписи.")
           .setPositiveButton("Закрыть",null).show());
       }catch(Exception ex){
         final String message=ex.getMessage()==null?ex.toString():ex.getMessage();
