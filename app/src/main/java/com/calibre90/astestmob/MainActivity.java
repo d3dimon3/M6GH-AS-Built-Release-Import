@@ -1190,11 +1190,11 @@ public class MainActivity extends Activity {
       c.save();c.clipRect(17,331,383,406);
       for(int i=0;i<items.size();i++){
         FeatureEngine.Feature feature=items.get(i);
-        int group=i/9,slot=i%9;
-        float x=19+(slot%3)*124f+group*372f-asBuiltHorizontalOffset;
-        float y=333+(slot/3)*24f;
-        if(x>383||x+120<17)continue;
-        card(c,x,y,118,21,5,false);
+        int group=i/6,slot=i%6;
+        float x=19+(slot%2)*184f+group*368f-asBuiltHorizontalOffset;
+        float y=333+(slot/2)*24f;
+        if(x>383||x+179<17)continue;
+        card(c,x,y,179,21,5,false);
         float bx=x+4,by=y+3;
         card(c,bx,by,15,15,3,false);
         boolean checked=enabled&&(active>=4?customChecked(feature):isChecked(feature));
@@ -1204,18 +1204,36 @@ public class MainActivity extends Activity {
           Path mark=new Path();mark.moveTo(bx+3,by+7);mark.lineTo(bx+6,by+10);mark.lineTo(bx+12,by+3);
           c.drawPath(mark,p);p.setStyle(Paint.Style.FILL);
         }
-        txtFit(c,feature.label,bx+19,y+15,10,enabled?Color.BLACK:Color.GRAY,92);
+        String label=feature.label==null?"":feature.label;
+        float fontSize=10f;
+        p.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));
+        p.setTextSize(fontSize);
+        while(fontSize>7f&&p.measureText(label)>153f){
+          fontSize-=0.25f;p.setTextSize(fontSize);
+        }
+        txtFit(c,label,bx+19,y+15,fontSize,enabled?Color.BLACK:Color.GRAY,153);
       }
       c.restore();
-      txt(c,"AS-BUILT  /  HEX",23,425,13,Color.BLACK,true);
-      c.save();c.clipRect(18,431,381,708);
+      // Non-interactive navigation hints: bright red only where more functions exist.
+      float maxHorizontal=Math.max(0,((items.size()+5)/6-1)*368f);
+      int arrowRed=Color.rgb(210,25,42);
+      p.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));
+      p.setTextSize(17f);p.setStyle(Paint.Style.FILL);
+      if(asBuiltHorizontalOffset>1f){
+        p.setColor(arrowRed);c.drawText("‹",27,419,p);
+      }
+      if(asBuiltHorizontalOffset<maxHorizontal-1f){
+        p.setColor(arrowRed);c.drawText("›",362,419,p);
+      }
+      txt(c,"AS-BUILT  /  HEX",23,435,13,Color.BLACK,true);
+      c.save();c.clipRect(18,440,381,708);
       final float step=30f;
       if(active<4){
         ArrayList<AbtCodec.Row> rows=abtRows[active];
-        float max=Math.max(0,rows.size()*step-277f);
+        float max=Math.max(0,rows.size()*step-268f);
         asBuiltRowOffset=Math.max(0,Math.min(asBuiltRowOffset,max));
         for(int i=Math.max(0,(int)(asBuiltRowOffset/step));i<rows.size();i++){
-          float y=433+i*step-asBuiltRowOffset;
+          float y=442+i*step-asBuiltRowOffset;
           if(y>708)break;
           AbtCodec.Row row=rows.get(i);
           card(c,19,y,362,27,5,false);
@@ -1406,7 +1424,7 @@ public class MainActivity extends Activity {
           if(startY>=331&&startY<406){
             if(Math.abs(x-asBuiltDownX)>4)asBuiltDragging=true;
             int count=active>=4?customFeatures(active).size():moduleFeatures(active).size();
-            float max=Math.max(0,((count+8)/9-1)*372f);
+            float max=Math.max(0,((count+5)/6-1)*368f);
             asBuiltHorizontalOffset=Math.max(0,Math.min(max,asBuiltHorizontalOffset+asBuiltLastX-x));
             asBuiltLastX=x;invalidate();return true;
           }
@@ -1420,7 +1438,7 @@ public class MainActivity extends Activity {
                 count=rows==null?0:rows.length();
               }
             }
-            float max=Math.max(0,count*30f-277f);
+            float max=Math.max(0,count*30f-268f);
             asBuiltRowOffset=Math.max(0,Math.min(max,asBuiltRowOffset+asBuiltLastY-y));
             asBuiltLastY=y;invalidate();return true;
           }
@@ -1429,11 +1447,11 @@ public class MainActivity extends Activity {
         if(e.getAction()==MotionEvent.ACTION_UP){
           if(startY>=331&&startY<406){
             if(asBuiltDragging||Math.abs(x-asBuiltDownX)>8)return true;
-            int group=(int)((x-19+asBuiltHorizontalOffset)/372f);
-            float local=x-19+asBuiltHorizontalOffset-group*372f;
-            int col=(int)(local/124f),row=(int)((y-333)/24f);
-            if(group>=0&&col>=0&&col<3&&row>=0&&row<3&&local%124f<118){
-              int index=group*9+row*3+col;
+            int group=(int)((x-19+asBuiltHorizontalOffset)/368f);
+            float local=x-19+asBuiltHorizontalOffset-group*368f;
+            int col=(int)(local/184f),row=(int)((y-333)/24f);
+            if(group>=0&&col>=0&&col<2&&row>=0&&row<3&&local%184f<179){
+              int index=group*6+row*2+col;
               boolean ready=active>=4?getSharedPreferences("studio_custom_abt_loaded",MODE_PRIVATE)
                 .getBoolean(customModuleCatalog().optJSONObject(active-4).optString("id"),false):loaded[active];
               if(!ready){Toast.makeText(MainActivity.this,"Сначала откройте ABT этого блока",Toast.LENGTH_SHORT).show();return true;}
