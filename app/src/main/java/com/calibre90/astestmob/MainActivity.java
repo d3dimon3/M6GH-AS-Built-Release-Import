@@ -2097,7 +2097,7 @@ public class MainActivity extends Activity {
             for(int originalIndex:group.getValue()){
               FeatureEngine.Feature f=features.get(originalIndex);
               TextView option=new TextView(this);
-              option.setText((originalIndex==chosen[0]?"◉  ":"○  ")+(originalIndex+1)+" · "+f.label);
+              option.setText((originalIndex==chosen[0]?"◉  ":"○  ")+f.label);
               option.setTextSize(16);
               option.setTextColor(Color.rgb(38,38,38));
               option.setGravity(Gravity.CENTER_VERTICAL);
