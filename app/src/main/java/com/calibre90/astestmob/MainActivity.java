@@ -1172,7 +1172,7 @@ public class MainActivity extends Activity {
         char ch=display.charAt(i);
         boolean hex=Character.digit(ch,16)>=0;
         p.setColor(hex&&positions.contains(hexIndex)?
-          Color.rgb(25,111,207):Color.rgb(28,43,62));
+          Color.rgb(0,75,255):Color.rgb(28,43,62));
         String glyph=String.valueOf(ch);
         c.drawText(glyph,cursor,baseline,p);
         cursor+=p.measureText(glyph);
