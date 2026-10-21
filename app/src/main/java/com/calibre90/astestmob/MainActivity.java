@@ -1171,8 +1171,9 @@ public class MainActivity extends Activity {
       for(int i=0;i<display.length();i++){
         char ch=display.charAt(i);
         boolean hex=Character.digit(ch,16)>=0;
-        p.setColor(hex&&positions.contains(hexIndex)?
-          Color.rgb(0,75,255):Color.rgb(28,43,62));
+        boolean highlighted=hex&&positions.contains(hexIndex);
+        p.setTypeface(Typeface.create("sans-serif",highlighted?Typeface.BOLD:Typeface.NORMAL));
+        p.setColor(highlighted?Color.rgb(0,55,230):Color.rgb(28,43,62));
         String glyph=String.valueOf(ch);
         c.drawText(glyph,cursor,baseline,p);
         cursor+=p.measureText(glyph);
