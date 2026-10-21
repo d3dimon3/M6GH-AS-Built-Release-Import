@@ -1151,8 +1151,73 @@ public class MainActivity extends Activity {
       p.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));p.setTextSize(size);p.setColor(color);p.setStyle(Paint.Style.FILL);
       c.drawText(s,x+(w-p.measureText(s))/2,y+h/2-(p.ascent()+p.descent())/2,p);
     }
+    // The third APK reuses the exact Config engine and signed Supabase catalog.
+    // Its different application ID enables a separate, independently installable UI.
+    boolean asBuiltVariant(){
+      return "com.calibre90.asbuiltconfig".equals(MainActivity.this.getPackageName());
+    }
+    float asBuiltHorizontalOffset=0f;
+    int asBuiltRowOffset=0;
+    void drawAsBuiltVariant(Canvas c,ArrayList<FeatureEngine.Feature> items,boolean enabled){
+      card(c,10,279,380,434,13,true);
+      txt(c,"ФУНКЦИИ БЛОКА  •  "+items.size(),20,308,15,Color.BLACK,true);
+      txtFit(c,enabled?"ABT загружен — выберите функции":
+        "Загрузите ABT, чтобы включить функции",20,332,12,enabled?Color.rgb(64,94,74):Color.DKGRAY,355);
+      // Three columns x three rows; freely draggable, no page snapping.
+      float cellWidth=124f,stepY=48f;
+      c.save();
+      c.clipRect(17,345,383,492);
+      for(int i=0;i<items.size();i++){
+        FeatureEngine.Feature feature=items.get(i);
+        int group=i/9,slot=i%9;
+        float x=19+(slot%3)*124f+group*372f-asBuiltHorizontalOffset;
+        float y=349+(slot/3)*48f;
+        if(x>383||x+120<17)continue;
+        card(c,x,y,118,40,8,false);
+        float bx=x+5,by=y+9;
+        card(c,bx,by,21,21,4,false);
+        boolean checked=enabled&&(active>=4?customChecked(feature):isChecked(feature));
+        if(checked){
+          rect(c,Color.rgb(210,28,37),bx+4,by+4,13,13,2);
+          p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);
+          Path mark=new Path();mark.moveTo(bx+4,by+11);mark.lineTo(bx+8,by+15);mark.lineTo(bx+17,by+5);
+          c.drawPath(mark,p);p.setStyle(Paint.Style.FILL);
+        }
+        txtFit(c,feature.label,bx+24,y+25,10,enabled?Color.BLACK:Color.GRAY,Math.max(20,88));
+      }
+      c.restore();
+      // Read-only ABT values use the same rows the existing open/save and HEX engine modify.
+      txt(c,"AS-BUILT  /  HEX",23,513,13,Color.BLACK,true);
+      c.save();c.clipRect(18,519,381,708);
+      if(active<4){
+        ArrayList<AbtCodec.Row> rows=abtRows[active];
+        asBuiltRowOffset=Math.max(0,Math.min(asBuiltRowOffset,Math.max(0,rows.size()-5)));
+        for(int i=asBuiltRowOffset;i<rows.size()&&i<asBuiltRowOffset+5;i++){
+          AbtCodec.Row row=rows.get(i);
+          float y=521+(i-asBuiltRowOffset)*37f;
+          card(c,19,y,362,34,6,false);
+          txtFit(c,row.address,29,y+22,12,Color.BLACK,140);
+          p.setColor(Color.rgb(191,198,210));p.setStrokeWidth(1);c.drawLine(169,y+3,169,y+31,p);
+          txtFit(c,row.value,179,y+22,12,Color.rgb(28,43,62),193);
+        }
+      }else{
+        org.json.JSONObject module=customModuleCatalog().optJSONObject(active-4);
+        if(module!=null){
+          org.json.JSONArray rows=PublishedFullSettings.builtInRowTemplates(MainActivity.this,module.optString("id"));
+          if(rows!=null)for(int i=0;i<Math.min(5,rows.length());i++){
+            org.json.JSONObject row=rows.optJSONObject(i);if(row==null)continue;
+            float y=521+i*37f;
+            card(c,19,y,362,34,6,false);
+            txtFit(c,row.optString("address"),29,y+22,12,Color.BLACK,140);
+            txtFit(c,row.optString("value"),179,y+22,12,Color.rgb(28,43,62),193);
+          }
+        }
+      }
+      c.restore();
+    }
     // Post 476 #10: options-only middle panel; never render addresses or HEX.
     void drawFeatureCards(Canvas c,ArrayList<FeatureEngine.Feature> items,boolean enabled,int page){
+      if(asBuiltVariant()){drawAsBuiltVariant(c,items,enabled);return;}
       card(c,10,279,380,434,13,true);
       txt(c,"ОПЦИИ БЛОКА  •  "+items.size(),20,308,15,Color.BLACK,true);
       txtFit(c,enabled?"ABT загружен — выберите функции":
@@ -1302,9 +1367,49 @@ public class MainActivity extends Activity {
       invalidate();
     }
     void revealActiveTab(){moduleTabOffset=0;}
-    @Override public boolean onTouchEvent(MotionEvent e){if(e.getAction()==MotionEvent.ACTION_DOWN){startY=e.getY()/sy;startX=e.getX()/sx;return true;}if(e.getAction()!=MotionEvent.ACTION_UP)return true;float x=e.getX()/sx,y=e.getY()/sy;
+    @Override public boolean onTouchEvent(MotionEvent e){
+      if(asBuiltVariant()){
+        float x=e.getX()/sx,y=e.getY()/sy;
+        if(e.getAction()==MotionEvent.ACTION_DOWN){startX=x;startY=y;return true;}
+        if(e.getAction()==MotionEvent.ACTION_MOVE){
+          if(startY>=345&&startY<492&&Math.abs(x-startX)>1){
+            int count=active>=4?customFeatures(active).size():moduleFeatures(active).size();
+            float max=Math.max(0,((count+8)/9-1)*372f);
+            asBuiltHorizontalOffset=Math.max(0,Math.min(max,asBuiltHorizontalOffset+startX-x));
+            startX=x;invalidate();return true;
+          }
+          return true;
+        }
+        if(e.getAction()==MotionEvent.ACTION_UP){
+          if(startY>=345&&startY<492){
+            if(Math.abs(y-startY)>16)return true;
+            int group=(int)((x-19+asBuiltHorizontalOffset)/372f);
+            float local=x-19+asBuiltHorizontalOffset-group*372f;
+            int col=(int)(local/124f),row=(int)((y-349)/48f);
+            if(group>=0&&col>=0&&col<3&&row>=0&&row<3&&local%124f<118){
+              int index=group*9+row*3+col;
+              boolean ready=active>=4?getSharedPreferences("studio_custom_abt_loaded",MODE_PRIVATE)
+                .getBoolean(customModuleCatalog().optJSONObject(active-4).optString("id"),false):loaded[active];
+              if(!ready){Toast.makeText(MainActivity.this,"Сначала откройте ABT этого блока",Toast.LENGTH_SHORT).show();return true;}
+              if(active>=4)toggleCustomFeature(index);else toggleFeature(index);
+            }
+            return true;
+          }
+          if(startY>=519&&startY<709&&Math.abs(y-startY)>18){
+            if(active<4){
+              int max=Math.max(0,abtRows[active].size()-5);
+              asBuiltRowOffset=Math.max(0,Math.min(max,asBuiltRowOffset+(startY>y?1:-1)*Math.max(1,Math.round(Math.abs(y-startY)/37f))));
+              invalidate();
+            }
+            return true;
+          }
+        }
+      }
+      if(e.getAction()==MotionEvent.ACTION_DOWN){startY=e.getY()/sy;startX=e.getX()/sx;return true;}
+      if(e.getAction()!=MotionEvent.ACTION_UP)return true;
+      float x=e.getX()/sx,y=e.getY()/sy;
       // Swipe only inside the feature viewport; ABT buttons below remain separate.
-      if(startY>=345&&startY<=712&&Math.abs(y-startY)>16){
+      if(!asBuiltVariant()&&startY>=345&&startY<=712&&Math.abs(y-startY)>16){
         scrollFeatures(Math.round((startY-y)/45f)==0?(startY>y?1:-1):Math.round((startY-y)/45f));
         return true;
       }
@@ -1324,7 +1429,7 @@ public class MainActivity extends Activity {
         return true;
       }
       if(adminSession&&x>=346&&y>=8&&y<=70){admin();return true;}
-      if(y>=350&&y<=713){
+      if(!asBuiltVariant()&&y>=350&&y<=713){
         boolean ready=active>=4?getSharedPreferences("studio_custom_abt_loaded",MODE_PRIVATE)
           .getBoolean(customModuleCatalog().optJSONObject(active-4).optString("id"),false):loaded[active];
         if(!ready){Toast.makeText(MainActivity.this,"Сначала откройте ABT этого блока",Toast.LENGTH_SHORT).show();return true;}
