@@ -1160,6 +1160,25 @@ public class MainActivity extends Activity {
     float asBuiltRowOffset=0f;
     float asBuiltLastX,asBuiltLastY,asBuiltDownX,asBuiltDownY;
     boolean asBuiltDragging=false;
+    // Blue highlights reflect the active feature's HEX positions, including
+    // functions detected as enabled immediately after importing an ABT file.
+    void drawActiveHex(Canvas c,AbtCodec.Row row,float x,float baseline){
+      String display=row.value==null?"":row.value;
+      Set<Integer> positions=activeFeaturePositions(active,row);
+      p.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));
+      p.setTextSize(11f);p.setStyle(Paint.Style.FILL);
+      float cursor=x;int hexIndex=0;
+      for(int i=0;i<display.length();i++){
+        char ch=display.charAt(i);
+        boolean hex=Character.digit(ch,16)>=0;
+        p.setColor(hex&&positions.contains(hexIndex)?
+          Color.rgb(25,111,207):Color.rgb(28,43,62));
+        String glyph=String.valueOf(ch);
+        c.drawText(glyph,cursor,baseline,p);
+        cursor+=p.measureText(glyph);
+        if(hex)hexIndex++;
+      }
+    }
     // Third APK only: 3x3 compact cards, continuously scrolling HEX rows.
     void drawAsBuiltVariant(Canvas c,ArrayList<FeatureEngine.Feature> items,boolean enabled){
       card(c,10,279,380,434,13,true);
@@ -1201,7 +1220,7 @@ public class MainActivity extends Activity {
           card(c,19,y,362,27,5,false);
           txtFit(c,row.address,29,y+18,11,Color.BLACK,140);
           p.setColor(Color.rgb(191,198,210));p.setStrokeWidth(1);c.drawLine(169,y+2,169,y+25,p);
-          txtFit(c,row.value,179,y+18,11,Color.rgb(28,43,62),193);
+          drawActiveHex(c,row,179,y+18);
         }
       }else{
         org.json.JSONObject module=customModuleCatalog().optJSONObject(active-4);
