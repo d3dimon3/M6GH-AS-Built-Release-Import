@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - release-supabase-v1
+      - feature/config-asbuilt-third-apk
   workflow_dispatch:
 
 jobs:
@@ -13,7 +14,7 @@ jobs:
       - name: Check out post-476 Release candidate source
         uses: actions/checkout@v4
         with:
-          ref: release-supabase-v1
+          ref: ${{ github.ref_name }}
           persist-credentials: false
 
       - name: Check out branded assets from main
@@ -192,10 +193,10 @@ jobs:
           print('Generated public-key source for both modules')
           PY
 
-      - name: Build both Android Release APKs
+      - name: Build all three Android Release APKs
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
-        run: gradle :app:assembleRelease :catalog-admin:assembleRelease -PbuildNumber=$((1000 + ${{ github.run_number }})) --stacktrace
+        run: gradle :app:assembleRelease :catalog-admin:assembleRelease :config-asbuilt:assembleRelease -PbuildNumber=$((1000 + ${{ github.run_number }})) --stacktrace
 
       - name: Align and sign Release APKs using existing update certificate
         shell: bash
@@ -204,7 +205,7 @@ jobs:
           ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -name zipalign -type f | sort -V | tail -1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
           test -n "$ZIPALIGN" && test -n "$APKSIGNER"
-          for module in app catalog-admin; do
+          for module in app catalog-admin config-asbuilt; do
             input="$module/build/outputs/apk/release/$module-release-unsigned.apk"
             test -s "$input"
             aligned="$RUNNER_TEMP/$module-release-aligned.apk"
@@ -218,7 +219,8 @@ jobs:
         run: |
           test -s app/build/outputs/apk/release/app-release.apk
           test -s catalog-admin/build/outputs/apk/release/catalog-admin-release.apk
-          ls -lh app/build/outputs/apk/release/app-release.apk catalog-admin/build/outputs/apk/release/catalog-admin-release.apk
+          test -s config-asbuilt/build/outputs/apk/release/config-asbuilt-release.apk
+          ls -lh app/build/outputs/apk/release/app-release.apk catalog-admin/build/outputs/apk/release/catalog-admin-release.apk config-asbuilt/build/outputs/apk/release/config-asbuilt-release.apk
 
       - name: Verify both APKs use the same persistent certificate
         shell: bash
@@ -249,4 +251,12 @@ jobs:
           if-no-files-found: error
           name: M6GH-AS-BUILT-ADMIN-Release-APK
           path: catalog-admin/build/outputs/apk/release/catalog-admin-release.apk
+          retention-days: 14
+
+      - name: Upload Config AS-Built Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: M6GH-CONFIG-AS-BUILT-Release-APK
+          path: config-asbuilt/build/outputs/apk/release/config-asbuilt-release.apk
           retention-days: 14
