@@ -1157,59 +1157,67 @@ public class MainActivity extends Activity {
       return "com.calibre90.asbuiltconfig".equals(MainActivity.this.getPackageName());
     }
     float asBuiltHorizontalOffset=0f;
-    int asBuiltRowOffset=0;
+    float asBuiltRowOffset=0f;
+    float asBuiltLastX,asBuiltLastY,asBuiltDownX,asBuiltDownY;
+    boolean asBuiltDragging=false;
+    // Third APK only: 3x3 compact cards, continuously scrolling HEX rows.
     void drawAsBuiltVariant(Canvas c,ArrayList<FeatureEngine.Feature> items,boolean enabled){
       card(c,10,279,380,434,13,true);
-      txt(c,"ФУНКЦИИ БЛОКА  •  "+items.size(),20,308,15,Color.BLACK,true);
+      txt(c,"ФУНКЦИИ БЛОКА  •  "+items.size(),20,302,14,Color.BLACK,true);
       txtFit(c,enabled?"ABT загружен — выберите функции":
-        "Загрузите ABT, чтобы включить функции",20,332,12,enabled?Color.rgb(64,94,74):Color.DKGRAY,355);
-      // Three columns x three rows; freely draggable, no page snapping.
-      float cellWidth=124f,stepY=48f;
-      c.save();
-      c.clipRect(17,345,383,492);
+        "Загрузите ABT, чтобы включить функции",20,323,11,
+        enabled?Color.rgb(64,94,74):Color.DKGRAY,355);
+      c.save();c.clipRect(17,331,383,406);
       for(int i=0;i<items.size();i++){
         FeatureEngine.Feature feature=items.get(i);
         int group=i/9,slot=i%9;
         float x=19+(slot%3)*124f+group*372f-asBuiltHorizontalOffset;
-        float y=349+(slot/3)*48f;
+        float y=333+(slot/3)*24f;
         if(x>383||x+120<17)continue;
-        card(c,x,y,118,40,8,false);
-        float bx=x+5,by=y+9;
-        card(c,bx,by,21,21,4,false);
+        card(c,x,y,118,21,5,false);
+        float bx=x+4,by=y+3;
+        card(c,bx,by,15,15,3,false);
         boolean checked=enabled&&(active>=4?customChecked(feature):isChecked(feature));
         if(checked){
-          rect(c,Color.rgb(210,28,37),bx+4,by+4,13,13,2);
-          p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);
-          Path mark=new Path();mark.moveTo(bx+4,by+11);mark.lineTo(bx+8,by+15);mark.lineTo(bx+17,by+5);
+          rect(c,Color.rgb(210,28,37),bx+3,by+3,9,9,2);
+          p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.6f);
+          Path mark=new Path();mark.moveTo(bx+3,by+7);mark.lineTo(bx+6,by+10);mark.lineTo(bx+12,by+3);
           c.drawPath(mark,p);p.setStyle(Paint.Style.FILL);
         }
-        txtFit(c,feature.label,bx+24,y+25,10,enabled?Color.BLACK:Color.GRAY,Math.max(20,88));
+        txtFit(c,feature.label,bx+19,y+15,10,enabled?Color.BLACK:Color.GRAY,92);
       }
       c.restore();
-      // Read-only ABT values use the same rows the existing open/save and HEX engine modify.
-      txt(c,"AS-BUILT  /  HEX",23,513,13,Color.BLACK,true);
-      c.save();c.clipRect(18,519,381,708);
+      txt(c,"AS-BUILT  /  HEX",23,425,13,Color.BLACK,true);
+      c.save();c.clipRect(18,431,381,708);
+      final float step=30f;
       if(active<4){
         ArrayList<AbtCodec.Row> rows=abtRows[active];
-        asBuiltRowOffset=Math.max(0,Math.min(asBuiltRowOffset,Math.max(0,rows.size()-5)));
-        for(int i=asBuiltRowOffset;i<rows.size()&&i<asBuiltRowOffset+5;i++){
+        float max=Math.max(0,rows.size()*step-277f);
+        asBuiltRowOffset=Math.max(0,Math.min(asBuiltRowOffset,max));
+        for(int i=Math.max(0,(int)(asBuiltRowOffset/step));i<rows.size();i++){
+          float y=433+i*step-asBuiltRowOffset;
+          if(y>708)break;
           AbtCodec.Row row=rows.get(i);
-          float y=521+(i-asBuiltRowOffset)*37f;
-          card(c,19,y,362,34,6,false);
-          txtFit(c,row.address,29,y+22,12,Color.BLACK,140);
-          p.setColor(Color.rgb(191,198,210));p.setStrokeWidth(1);c.drawLine(169,y+3,169,y+31,p);
-          txtFit(c,row.value,179,y+22,12,Color.rgb(28,43,62),193);
+          card(c,19,y,362,27,5,false);
+          txtFit(c,row.address,29,y+18,11,Color.BLACK,140);
+          p.setColor(Color.rgb(191,198,210));p.setStrokeWidth(1);c.drawLine(169,y+2,169,y+25,p);
+          txtFit(c,row.value,179,y+18,11,Color.rgb(28,43,62),193);
         }
       }else{
         org.json.JSONObject module=customModuleCatalog().optJSONObject(active-4);
         if(module!=null){
           org.json.JSONArray rows=PublishedFullSettings.builtInRowTemplates(MainActivity.this,module.optString("id"));
-          if(rows!=null)for(int i=0;i<Math.min(5,rows.length());i++){
-            org.json.JSONObject row=rows.optJSONObject(i);if(row==null)continue;
-            float y=521+i*37f;
-            card(c,19,y,362,34,6,false);
-            txtFit(c,row.optString("address"),29,y+22,12,Color.BLACK,140);
-            txtFit(c,row.optString("value"),179,y+22,12,Color.rgb(28,43,62),193);
+          if(rows!=null){
+            float max=Math.max(0,rows.length()*step-277f);
+            asBuiltRowOffset=Math.max(0,Math.min(asBuiltRowOffset,max));
+            for(int i=Math.max(0,(int)(asBuiltRowOffset/step));i<rows.length();i++){
+              float y=433+i*step-asBuiltRowOffset;
+              if(y>708)break;
+              org.json.JSONObject row=rows.optJSONObject(i);if(row==null)continue;
+              card(c,19,y,362,27,5,false);
+              txtFit(c,row.optString("address"),29,y+18,11,Color.BLACK,140);
+              txtFit(c,row.optString("value"),179,y+18,11,Color.rgb(28,43,62),193);
+            }
           }
         }
       }
@@ -1370,22 +1378,40 @@ public class MainActivity extends Activity {
     @Override public boolean onTouchEvent(MotionEvent e){
       if(asBuiltVariant()){
         float x=e.getX()/sx,y=e.getY()/sy;
-        if(e.getAction()==MotionEvent.ACTION_DOWN){startX=x;startY=y;return true;}
+        if(e.getAction()==MotionEvent.ACTION_DOWN){
+          startX=x;startY=y;asBuiltDownX=x;asBuiltDownY=y;
+          asBuiltLastX=x;asBuiltLastY=y;asBuiltDragging=false;return true;
+        }
         if(e.getAction()==MotionEvent.ACTION_MOVE){
-          if(startY>=345&&startY<492&&Math.abs(x-startX)>1){
+          if(startY>=331&&startY<406){
+            if(Math.abs(x-asBuiltDownX)>4)asBuiltDragging=true;
             int count=active>=4?customFeatures(active).size():moduleFeatures(active).size();
             float max=Math.max(0,((count+8)/9-1)*372f);
-            asBuiltHorizontalOffset=Math.max(0,Math.min(max,asBuiltHorizontalOffset+startX-x));
-            startX=x;invalidate();return true;
+            asBuiltHorizontalOffset=Math.max(0,Math.min(max,asBuiltHorizontalOffset+asBuiltLastX-x));
+            asBuiltLastX=x;invalidate();return true;
+          }
+          if(startY>=431&&startY<709){
+            if(Math.abs(y-asBuiltDownY)>4)asBuiltDragging=true;
+            int count=active<4?abtRows[active].size():0;
+            if(active>=4){
+              org.json.JSONObject module=customModuleCatalog().optJSONObject(active-4);
+              if(module!=null){
+                org.json.JSONArray rows=PublishedFullSettings.builtInRowTemplates(MainActivity.this,module.optString("id"));
+                count=rows==null?0:rows.length();
+              }
+            }
+            float max=Math.max(0,count*30f-277f);
+            asBuiltRowOffset=Math.max(0,Math.min(max,asBuiltRowOffset+asBuiltLastY-y));
+            asBuiltLastY=y;invalidate();return true;
           }
           return true;
         }
         if(e.getAction()==MotionEvent.ACTION_UP){
-          if(startY>=345&&startY<492){
-            if(Math.abs(y-startY)>16)return true;
+          if(startY>=331&&startY<406){
+            if(asBuiltDragging||Math.abs(x-asBuiltDownX)>8)return true;
             int group=(int)((x-19+asBuiltHorizontalOffset)/372f);
             float local=x-19+asBuiltHorizontalOffset-group*372f;
-            int col=(int)(local/124f),row=(int)((y-349)/48f);
+            int col=(int)(local/124f),row=(int)((y-333)/24f);
             if(group>=0&&col>=0&&col<3&&row>=0&&row<3&&local%124f<118){
               int index=group*9+row*3+col;
               boolean ready=active>=4?getSharedPreferences("studio_custom_abt_loaded",MODE_PRIVATE)
@@ -1395,14 +1421,7 @@ public class MainActivity extends Activity {
             }
             return true;
           }
-          if(startY>=519&&startY<709&&Math.abs(y-startY)>18){
-            if(active<4){
-              int max=Math.max(0,abtRows[active].size()-5);
-              asBuiltRowOffset=Math.max(0,Math.min(max,asBuiltRowOffset+(startY>y?1:-1)*Math.max(1,Math.round(Math.abs(y-startY)/37f))));
-              invalidate();
-            }
-            return true;
-          }
+          if(startY>=431&&startY<709)return true;
         }
       }
       if(e.getAction()==MotionEvent.ACTION_DOWN){startY=e.getY()/sy;startX=e.getX()/sx;return true;}
