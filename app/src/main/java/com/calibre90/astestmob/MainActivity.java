@@ -2062,19 +2062,67 @@ public class MainActivity extends Activity {
           heading.setText(n>=0&&n<features.size()?(n+1)+" · "+features.get(n).label:"Выберите запись");
         };
         heading.setOnClickListener(v->{
-          String[] options=new String[features.size()];
-          for(int n=0;n<features.size();n++)options[n]=(n+1)+" · "+features.get(n).label;
-          new AlertDialog.Builder(this).setTitle("Выберите функцию")
-            .setSingleChoiceItems(options,chosen[0],(choiceDialog,position)->{
-              chosen[0]=position;
-              FeatureEngine.Feature f=features.get(position);
-              heading.setText((position+1)+" · "+f.label);
-              String[] info={f.id,f.module,f.label,f.address,f.mode,
-                "HEX".equalsIgnoreCase(f.mode)?f.indices:"",
-                String.valueOf(f.byteIndex),"BITS".equalsIgnoreCase(f.mode)?f.indices:"",f.on,f.off};
-              for(int j=0;j<values.length;j++)values[j].setText(info[j]);
-              refreshFeatureChoices.run();choiceDialog.dismiss();
-            }).setNegativeButton("Закрыть",null).show();
+          // Presentation only: group by the existing module field, preserve original indices.
+          java.util.LinkedHashMap<String,java.util.ArrayList<Integer>> grouped=new java.util.LinkedHashMap<>();
+          for(String module:modules)grouped.put(module,new java.util.ArrayList<>());
+          org.json.JSONArray customCatalog=customModuleCatalog();
+          for(int k=0;k<customCatalog.length();k++){
+            org.json.JSONObject module=customCatalog.optJSONObject(k);
+            if(module!=null){
+              String id=module.optString("id").trim();
+              if(!id.isEmpty()&&!grouped.containsKey(id))grouped.put(id,new java.util.ArrayList<>());
+            }
+          }
+          for(int n=0;n<features.size();n++){
+            String module=features.get(n).module==null?"":features.get(n).module.trim();
+            if(module.isEmpty())module="ДРУГИЕ";
+            if(!grouped.containsKey(module))grouped.put(module,new java.util.ArrayList<>());
+            grouped.get(module).add(n);
+          }
+          LinearLayout groups=new LinearLayout(this);
+          groups.setOrientation(LinearLayout.VERTICAL);
+          final AlertDialog[] picker={null};
+          for(java.util.Map.Entry<String,java.util.ArrayList<Integer>> group:grouped.entrySet()){
+            if(group.getValue().isEmpty())continue;
+            TextView section=new TextView(this);
+            section.setText(group.getKey());
+            section.setTextSize(17);
+            section.setTextColor(Color.BLACK);
+            section.setTypeface(null,Typeface.BOLD);
+            section.setPadding(dp(18),dp(12),dp(12),dp(10));
+            groups.addView(section,new LinearLayout.LayoutParams(-1,-2));
+            LinearLayout entries=new LinearLayout(this);
+            entries.setOrientation(LinearLayout.VERTICAL);
+            groups.addView(entries,new LinearLayout.LayoutParams(-1,-2));
+            for(int originalIndex:group.getValue()){
+              FeatureEngine.Feature f=features.get(originalIndex);
+              TextView option=new TextView(this);
+              option.setText((originalIndex==chosen[0]?"◉  ":"○  ")+(originalIndex+1)+" · "+f.label);
+              option.setTextSize(16);
+              option.setTextColor(Color.rgb(38,38,38));
+              option.setGravity(Gravity.CENTER_VERTICAL);
+              option.setPadding(dp(26),dp(12),dp(12),dp(12));
+              entries.addView(option,new LinearLayout.LayoutParams(-1,-2));
+              option.setOnClickListener(clicked->{
+                chosen[0]=originalIndex;
+                String[] info={f.id,f.module,f.label,f.address,f.mode,
+                  "HEX".equalsIgnoreCase(f.mode)?f.indices:"",
+                  String.valueOf(f.byteIndex),"BITS".equalsIgnoreCase(f.mode)?f.indices:"",f.on,f.off};
+                for(int j=0;j<values.length;j++)values[j].setText(info[j]);
+                refreshFeatureChoices.run();
+                if(picker[0]!=null)picker[0].dismiss();
+              });
+            }
+            // All sections initially visible; tap a module heading to collapse or expand it.
+            section.setOnClickListener(clicked->entries.setVisibility(
+              entries.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
+          }
+          android.widget.ScrollView listScroll=new android.widget.ScrollView(this);
+          listScroll.setFillViewport(false);
+          listScroll.addView(groups);
+          picker[0]=new AlertDialog.Builder(this).setTitle("Выберите функцию")
+            .setView(listScroll).setNegativeButton("Закрыть",null).create();
+          picker[0].show();
         });
         LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);
         panel.addView(content,new LinearLayout.LayoutParams(-1,-2));
