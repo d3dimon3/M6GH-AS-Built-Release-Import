@@ -131,6 +131,7 @@ class WindowsConfig(tk.Tk):
         self.admin_unlocked = False
         self.admin_authenticated = False
         self.admin_extra_rows = set()
+        self.admin_visible_modules = set(MODULES)
         self.catalog_version = None
         self.withdraw()
         self.after(100, self.enforce_license)
@@ -528,7 +529,31 @@ class WindowsConfig(tk.Tk):
         tk.Label(rows_page, text="Изменяются только дополнительные адреса каталога в текущем сеансе; исходный ABT не затрагивается.",
                  bg="#f4f4f6", fg="#8a2534").pack(pady=5)
         refresh_rows()
-        for title in ("Блоки и доступ", "Оформление", "FAQ"):
+        access_page = pages["Блоки и доступ"]
+        tk.Label(access_page, text="Отображение блоков", font=("Segoe UI", 15, "bold"),
+                 bg="#f4f4f6").pack(pady=20)
+        module_vars = {}
+        for module in MODULES:
+            variable = tk.BooleanVar(value=module in self.admin_visible_modules)
+            module_vars[module] = variable
+            tk.Checkbutton(access_page, text=module, variable=variable, bg="#f4f4f6",
+                           font=("Segoe UI", 12)).pack(anchor="w", padx=80, pady=4)
+        def apply_access():
+            enabled = {module for module, variable in module_vars.items() if variable.get()}
+            if not enabled:
+                messagebox.showerror("Блоки", "Оставьте хотя бы один блок.", parent=dialog)
+                return
+            self.admin_visible_modules = enabled
+            for module, button in self.tabs.items():
+                if module in enabled:
+                    button.pack(side="left", fill="x", expand=True, padx=3, pady=3)
+                else:
+                    button.pack_forget()
+            if self.active_module not in enabled:
+                self.select_module(next(m for m in MODULES if m in enabled))
+            self.status.configure(text="Отображение блоков изменено локально.")
+        tk.Button(access_page, text="Применить", command=apply_access).pack(pady=15)
+        for title in ("Оформление", "FAQ"):
             page = pages[title]
             tk.Label(page, text=title, font=("Segoe UI", 15, "bold"), bg="#f4f4f6").pack(pady=25)
             tk.Label(page, text="Раздел восстановлен в интерфейсе. Редактирование и публикация будут подключены на следующем этапе.",
