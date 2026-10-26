@@ -121,7 +121,7 @@ class HexTable(tk.Frame):
         header.pack(fill="x")
         for title, width in (("Адрес строки", 16), ("Значение HEX", 30)):
             tk.Label(header, text=title, width=width, bg="#dedee3",
-                     font=("Segoe UI", 10, "bold"), anchor="center").pack(
+                     font=("Segoe UI", 9, "bold"), anchor="center").pack(
                          side="left", fill="x", expand=True, pady=3)
         self.body = tk.Frame(self, bg="#c4c4cb")
         self.body.pack(fill="both", expand=True)
@@ -151,18 +151,18 @@ class HexTable(tk.Frame):
         address_cell = tk.Frame(row, bg="#f0f0f2", bd=1, relief="solid")
         address_cell.pack(side="left", fill="both", expand=True, padx=(0, 1))
         tk.Label(address_cell, text=address, width=16, bg="#f0f0f2",
-                 fg="#222222", font=("Consolas", 11, "bold"),
-                 anchor="center", pady=1).pack(fill="x")
+                 fg="#222222", font=("Consolas", 9, "bold"),
+                 anchor="center", pady=0).pack(fill="x")
         value_cell = tk.Frame(row, bg="#f0f0f2", bd=1, relief="solid")
         value_cell.pack(side="left", fill="both", expand=True)
         text = tk.Text(value_cell, height=1, width=30, bg="#f0f0f2",
-                       fg="#3b3b3b", font=("Consolas", 11), relief="flat",
-                       bd=0, padx=5, pady=1, highlightthickness=0,
+                       fg="#3b3b3b", font=("Consolas", 9), relief="flat",
+                       bd=0, padx=5, pady=0, highlightthickness=0,
                        wrap="none", cursor="arrow")
         text.pack(fill="x")
         text.insert("1.0", value)
         text.tag_configure("active", foreground="#c81930",
-                           font=("Consolas", 11, "bold"))
+                           font=("Consolas", 9, "bold"))
         raw_index = 0
         for column, char in enumerate(value):
             if char != " ":
@@ -1232,6 +1232,8 @@ class WindowsConfig(tk.Tk):
         text.insert("end", self.admin_warning_title + "\n" + self.admin_warning_text + "\n\n\n\n\n", "warning")
         for number, (role, name, link) in enumerate(self.admin_authors):
             text.insert("end", role + ": ")
+            text.tag_configure("drive2_icon", foreground="#c81930", font=("Segoe UI", 11, "bold"))
+            text.insert("end", "▣D  ", ("drive2_icon",))
             if link and link.startswith(("https://", "http://")):
                 tag = "author_link_" + str(number)
                 text.tag_configure(tag, foreground="#1264a3", underline=True)
