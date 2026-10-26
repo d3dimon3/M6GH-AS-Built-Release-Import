@@ -629,6 +629,64 @@ class WindowsConfig(tk.Tk):
         tk.Label(faq_page, text="Изменения видны в FAQ до перезапуска; публикации на сервер нет.",
                  bg="#f4f4f6").pack()
         refresh_faq()
+        def save_admin_draft():
+            path = filedialog.asksaveasfilename(parent=dialog, title="Сохранить настройки админки",
+                                                defaultextension=".json", filetypes=[("JSON", "*.json")])
+            if not path:
+                return
+            data = {
+                "format": "m6gh-windows-admin-draft-v1",
+                "features": [dict(id=f.id, module=f.module, address=f.address,
+                                  mode=f.mode, indices=f.indices, on=f.on, off=f.off,
+                                  byte_index=f.byte_index, label=f.label) for f in self.features],
+                "extra_rows": [list(item) for item in sorted(self.admin_extra_rows)],
+                "visible_modules": sorted(self.admin_visible_modules),
+                "heading": self.admin_heading,
+                "faq": self.faq_entries,
+            }
+            try:
+                Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            except OSError as exc:
+                messagebox.showerror("Сохранение", str(exc), parent=dialog)
+                return
+            messagebox.showinfo("Админка", "Локальный файл настроек сохранён.", parent=dialog)
+
+        def load_admin_draft():
+            path = filedialog.askopenfilename(parent=dialog, title="Открыть настройки админки",
+                                              filetypes=[("JSON", "*.json")])
+            if not path:
+                return
+            try:
+                data = json.loads(Path(path).read_text(encoding="utf-8"))
+                if data.get("format") != "m6gh-windows-admin-draft-v1":
+                    raise ValueError("Неверный формат настроек")
+                features = [Feature(**item) for item in data["features"]]
+                extra_rows = {(module, address) for module, address in data["extra_rows"]
+                              if module in MODULES and re.fullmatch(r"[0-9A-F]{3}-[0-9]{2}-[0-9]{2}", address)
+                              and address.startswith(MODULES[module] + "-")}
+                visible = set(data["visible_modules"]) & set(MODULES)
+                heading = str(data["heading"])
+                faq = data["faq"]
+                if not visible or not 1 <= len(heading) <= 45 or not isinstance(faq, list):
+                    raise ValueError("Некорректные настройки")
+            except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+                messagebox.showerror("Загрузка", str(exc), parent=dialog)
+                return
+            self.features = features
+            self.admin_extra_rows = extra_rows
+            self.admin_visible_modules = visible
+            self.admin_heading = heading
+            self.faq_entries = faq
+            self.heading_label.configure(text=heading)
+            self.select_module(self.active_module if self.active_module in visible else next(iter(sorted(visible))))
+            refresh_rows()
+            refresh_faq()
+            messagebox.showinfo("Админка", "Черновик загружен. Для обновления вкладок перезапустите админку.", parent=dialog)
+
+        draft_buttons = tk.Frame(dialog)
+        draft_buttons.pack(pady=(0, 5))
+        tk.Button(draft_buttons, text="Сохранить настройки JSON", command=save_admin_draft).pack(side="left", padx=5)
+        tk.Button(draft_buttons, text="Загрузить настройки JSON", command=load_admin_draft).pack(side="left", padx=5)
         tk.Button(dialog, text="Закрыть", command=dialog.destroy).pack(pady=(0, 10))
 
     def load_cached_settings(self):
