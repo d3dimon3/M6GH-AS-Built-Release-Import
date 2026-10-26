@@ -243,7 +243,7 @@ class WindowsConfig(tk.Tk):
                 elif isinstance(exc, urllib.error.URLError):
                     detail = "Нет соединения с сервером"
                 elif isinstance(exc, (ValueError, KeyError, TypeError)):
-                    detail = "Ошибка проверки публикации: " + str(exc)[:120]
+                    detail = ("Подпись публикации не совпадает с ключом приложения" if "Invalid publisher RSA signature" in str(exc) else "Ошибка проверки публикации: " + str(exc)[:120])
                 else:
                     detail = type(exc).__name__
                 self.after(0, lambda d=detail: self.status.configure(
