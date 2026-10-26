@@ -130,6 +130,7 @@ class WindowsConfig(tk.Tk):
         self.faq_entries = []
         self.admin_unlocked = False
         self.admin_authenticated = False
+        self.admin_extra_rows = set()
         self.catalog_version = None
         self.withdraw()
         self.after(100, self.enforce_license)
@@ -477,23 +478,56 @@ class WindowsConfig(tk.Tk):
             messagebox.showinfo("Экспорт", "Каталог сохранён локально. На сервер ничего не отправлено.", parent=dialog)
         tk.Button(features_page, text="Экспорт функций в JSON", command=export_catalog).pack(pady=5)
         rows_page = pages["Строки AS-Built"]
-        tk.Label(rows_page, text="Адреса каталога и строки открытого ABT (только просмотр)",
-                 bg="#f4f4f6", font=("Segoe UI", 12, "bold")).pack(pady=10)
+        tk.Label(rows_page, text="Каталог адресов AS-Built", bg="#f4f4f6",
+                 font=("Segoe UI", 12, "bold")).pack(pady=10)
         row_columns = ("Блок", "Адрес", "HEX из ABT", "Функций")
-        row_tree = ttk.Treeview(rows_page, columns=row_columns, show="headings", height=15)
+        row_tree = ttk.Treeview(rows_page, columns=row_columns, show="headings", height=13)
         for column, width in zip(row_columns, (100, 160, 260, 100)):
             row_tree.heading(column, text=column)
             row_tree.column(column, width=width, anchor="center")
         row_tree.pack(fill="both", expand=True, padx=14, pady=8)
-        addresses = set((f.module, f.address) for f in self.features)
-        addresses.update((self.active_module, address) for address, value in self.rows)
-        for module, address in sorted(addresses):
-            original = next((v for a, v in self.rows if a == address), "")
-            shown = self.preview_rows.get(address, original) if original else "—"
-            count = sum(f.module == module and f.address == address for f in self.features)
-            row_tree.insert("", "end", values=(module, address, shown, count))
-        tk.Label(rows_page, text="Адреса берутся из опубликованных функций; HEX появляется после открытия ABT.",
-                 bg="#f4f4f6", fg="#555555").pack(pady=5)
+        def refresh_rows():
+            row_tree.delete(*row_tree.get_children())
+            addresses = set((f.module, f.address) for f in self.features)
+            addresses.update((self.active_module, address) for address, value in self.rows)
+            addresses.update(self.admin_extra_rows)
+            for module, address in sorted(addresses):
+                original = next((v for a, v in self.rows if a == address), "")
+                shown = self.preview_rows.get(address, original) if original else "—"
+                count = sum(f.module == module and f.address == address for f in self.features)
+                row_tree.insert("", "end", values=(module, address, shown, count))
+        controls = tk.Frame(rows_page, bg="#f4f4f6")
+        controls.pack(pady=5)
+        tk.Label(controls, text="Блок", bg="#f4f4f6").pack(side="left")
+        module_var = tk.StringVar(value=self.active_module)
+        ttk.Combobox(controls, textvariable=module_var, values=list(MODULES), state="readonly",
+                     width=7).pack(side="left", padx=6)
+        tk.Label(controls, text="Адрес", bg="#f4f4f6").pack(side="left")
+        address_entry = tk.Entry(controls, width=15)
+        address_entry.pack(side="left", padx=6)
+        def add_address():
+            module = module_var.get()
+            address = address_entry.get().strip().upper()
+            if not re.fullmatch(r"[0-9A-F]{3}-[0-9]{2}-[0-9]{2}", address) or not address.startswith(MODULES[module] + "-"):
+                messagebox.showerror("Адрес", "Укажите адрес выбранного блока, например 720-01-01", parent=dialog)
+                return
+            self.admin_extra_rows.add((module, address))
+            refresh_rows()
+        def remove_address():
+            selection = row_tree.selection()
+            if not selection:
+                return
+            module, address = row_tree.item(selection[0], "values")[:2]
+            if (module, address) not in self.admin_extra_rows:
+                messagebox.showinfo("Адрес", "Строки из ABT или каталога функций нельзя удалить здесь.", parent=dialog)
+                return
+            self.admin_extra_rows.discard((module, address))
+            refresh_rows()
+        tk.Button(controls, text="Добавить адрес", command=add_address).pack(side="left", padx=5)
+        tk.Button(controls, text="Удалить добавленный", command=remove_address).pack(side="left", padx=5)
+        tk.Label(rows_page, text="Изменяются только дополнительные адреса каталога в текущем сеансе; исходный ABT не затрагивается.",
+                 bg="#f4f4f6", fg="#8a2534").pack(pady=5)
+        refresh_rows()
         for title in ("Блоки и доступ", "Оформление", "FAQ"):
             page = pages[title]
             tk.Label(page, text=title, font=("Segoe UI", 15, "bold"), bg="#f4f4f6").pack(pady=25)
