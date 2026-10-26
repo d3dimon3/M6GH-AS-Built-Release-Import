@@ -233,8 +233,8 @@ class WindowsConfig(tk.Tk):
                                (self.admin_save_caption, self.save_abt)):
             button = tk.Button(actions, text=label, command=command,
                       font=("Segoe UI", 12, "bold"), padx=16, pady=7,
-                      bg="#f4f4f6", activebackground="#e8e8ec").pack(
-                          side="left", fill="x", expand=True, padx=4)
+                      bg="#f4f4f6", activebackground="#e8e8ec")
+            button.pack(side="left", fill="x", expand=True, padx=4)
             self.action_buttons.append(button)
         self.status = tk.Label(root, wraplength=810, text="Перед изменением сохраняйте резервную копию исходного ABT",
                                bg="#f4f4f6", fg="#202020", font=("Segoe UI", 9),
