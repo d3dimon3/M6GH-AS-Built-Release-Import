@@ -1,6 +1,10 @@
 name: Build Windows Config EXE
 on:
   workflow_dispatch:
+  push:
+    branches: [windows-config-v1]
+    paths:
+      - '.github/workflows/windows-config-build.yml'
 
 permissions:
   contents: read
