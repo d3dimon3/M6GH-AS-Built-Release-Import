@@ -180,7 +180,7 @@ class WindowsConfig(tk.Tk):
         top = tk.Frame(root, bg="#d7d7d7")
         top.pack(fill="x", pady=(0, 5))
         top.lift()
-        heading.pack(side="left", anchor="w")
+        heading.pack(in_=top, side="left", anchor="w")
         helpbar = tk.Frame(top, bg="#d7d7d7")
         helpbar.pack(side="right")
         for caption, callback in (("FAQ", self.show_faq), ("О программе", self.show_about)):
