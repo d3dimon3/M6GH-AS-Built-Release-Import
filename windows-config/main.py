@@ -12,6 +12,7 @@ from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
 import json
 import os
+import sys
 import threading
 import logging
 import urllib.error
@@ -479,7 +480,12 @@ class WindowsConfig(tk.Tk):
         """Restore the admin-only local draft after online catalog loading."""
         path = Path.home() / ".m6gh_asbuilt_config" / "windows_admin_draft.json"
         if not path.exists():
-            return
+            # Factory catalog is applied only on a fresh install; never overwrite local edits.
+            bundle_dir = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+            bundled = bundle_dir / "default_admin_settings.json"
+            if not bundled.exists():
+                return
+            path = bundled
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             if data.get("format") != "m6gh-windows-admin-draft-v1":
@@ -735,12 +741,12 @@ class WindowsConfig(tk.Tk):
                  bg="#f4f4f6", fg="#8a2534").pack(pady=5)
         refresh_rows()
         access_page = pages["Блоки и доступ"]
-        tk.Label(access_page, text="Блоки и доступ", font=("Segoe UI", 16, "bold"),
-                 bg="#f4f4f6").pack(pady=(12, 4))
+        tk.Label(access_page, text="Блоки и доступ", font=("Segoe UI", 12, "bold"),
+                 bg="#f4f4f6").pack(pady=(4, 2))
         tk.Label(access_page, text="Настройки блоков. HEX-префиксы защищены от случайного изменения.",
-                 bg="#f4f4f6", fg="#555555").pack(pady=(0, 6))
+                 bg="#f4f4f6", fg="#555555").pack(pady=(0, 3))
         holder = tk.Frame(access_page, bg="#f4f4f6")
-        holder.pack(fill="both", expand=True, padx=14)
+        holder.pack(fill="both", expand=True, padx=6)
         canvas = tk.Canvas(holder, bg="#f4f4f6", highlightthickness=0)
         scroll = ttk.Scrollbar(holder, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scroll.set)
@@ -754,27 +760,27 @@ class WindowsConfig(tk.Tk):
         for module, prefix in MODULES.items():
             info = self.admin_module_info.get(module, {})
             card = tk.Frame(cards, bg="#ffffff", highlightbackground="#c81930",
-                            highlightthickness=1, padx=12, pady=8)
-            card.pack(fill="x", padx=5, pady=5)
+                            highlightthickness=1, padx=6, pady=3)
+            card.pack(fill="x", padx=3, pady=2)
             header = tk.Frame(card, bg="#ffffff")
             header.pack(fill="x")
             tk.Label(header, text=module, bg="#ffffff", fg="#b71930",
-                     font=("Segoe UI", 13, "bold")).pack(side="left")
+                     font=("Segoe UI", 10, "bold")).pack(side="left")
             enabled = tk.BooleanVar(value=module in self.admin_visible_modules)
             module_vars[module] = enabled
             tk.Checkbutton(header, text="Показывать в Config", variable=enabled,
                            bg="#ffffff").pack(side="right")
             form = tk.Frame(card, bg="#ffffff")
-            form.pack(fill="x", pady=(6, 0))
+            form.pack(fill="x", pady=(2, 0))
             for col, (caption, value, editable) in enumerate((
                 ("Название", info.get("name", module), True),
                 ("ID / HEX-адрес", prefix, False),
                 ("Версия", info.get("version", ""), True),
             )):
                 tk.Label(form, text=caption, bg="#ffffff").grid(row=0, column=col, sticky="w", padx=5)
-                entry = tk.Entry(form, width=24 if col == 0 else 16)
+                entry = tk.Entry(form, width=18 if col == 0 else 12)
                 entry.insert(0, value)
-                entry.grid(row=1, column=col, sticky="ew", padx=5, pady=3)
+                entry.grid(row=1, column=col, sticky="ew", padx=3, pady=1)
                 form.columnconfigure(col, weight=1)
                 if not editable:
                     entry.configure(state="readonly")
