@@ -336,7 +336,7 @@ class WindowsConfig(tk.Tk):
         password.pack()
         def submit():
             # Historical Windows V7.1 credential hash; no credentials in server calls.
-            old_hash = "PLACEHOLDER_LEGACY_HASH"
+            old_hash = "10fc43c5bfa932bbc1f854e2442f9501743c3c95eb7df13ae48574cc5ac8aa9c"
             if login.get() == "admin" and hmac.compare_digest(hashlib.sha256(password.get().encode()).hexdigest(), old_hash):
                 self.admin_authenticated = True
                 self.admin_button.pack(side="left", padx=4, before=self.helpbar.winfo_children()[0])
