@@ -301,15 +301,6 @@ class WindowsConfig(tk.Tk):
                       font=("Segoe UI", 10, "bold"), padx=12, pady=3).pack(side="left", padx=4)
 
         self.admin_button = tk.Button(helpbar, text="Админ-панель", command=self.show_admin_login, bg="#c81930", fg="white", font=("Segoe UI", 10, "bold"))
-        tabbar = self.panel(root)
-        tabbar.pack(fill="x", pady=(0, 6))
-        for module in MODULES:
-            button = tk.Button(tabbar, text=module, font=("Segoe UI", 10, "bold"),
-                               relief="raised", bd=1, padx=5, pady=2,
-                               command=lambda m=module: self.select_module(m))
-            button.pack(side="left", fill="x", expand=True, padx=2, pady=2)
-            self.tabs[module] = button
-
         info = self.panel(root)
         info.pack(fill="x", pady=(0, 6))
         self.module_label = tk.Label(info, bg="#f4f4f6", fg="#222222",
@@ -334,21 +325,40 @@ class WindowsConfig(tk.Tk):
                                anchor="w", padx=5, pady=2,
                                highlightbackground="#b61d31", highlightthickness=2)
         self.status.pack(side="bottom", fill="x", pady=(0, 5))
-        main = self.panel(root)
-        main.pack(fill="both", expand=True, pady=(0, 3))
-        tk.Label(main, text="ФУНКЦИИ БЛОКА", font=("Segoe UI", 11, "bold"),
-                 bg="#f4f4f6", anchor="w").pack(fill="x", padx=8, pady=(5, 1))
-        self.features_hint = tk.Label(main, text="Загрузите локальный JSON с функциями для предварительной проверки",
-                 font=("Segoe UI", 10), bg="#f4f4f6", fg="#555555",
-                 anchor="w")
-        self.features_hint.pack(fill="x", padx=8, pady=(0, 2))
-        self.feature_panel = tk.Frame(main, bg="#f4f4f6")
-        self.feature_panel.pack(fill="x", padx=8, pady=(0, 2))
-        tk.Label(main, text="AS-BUILT / HEX", font=("Segoe UI", 11, "bold"),
-                 bg="#f4f4f6", anchor="w").pack(fill="x", padx=8, pady=(0, 3))
+        workspace = tk.Frame(root, bg="#d7d7d7")
+        workspace.pack(fill="both", expand=True, pady=(0, 3))
 
-        grid = tk.Frame(main, bg="#f4f4f6")
-        grid.pack(fill="both", expand=True, padx=8, pady=(0, 4))
+        tabbar = self.panel(workspace)
+        tabbar.pack(side="left", fill="y", padx=(0, 5))
+        for module in MODULES:
+            button = tk.Button(tabbar, text=module, font=("Segoe UI", 9, "bold"),
+                               width=5, relief="raised", bd=1, padx=1, pady=7,
+                               command=lambda m=module: self.select_module(m))
+            button.pack(fill="x", padx=2, pady=3)
+            self.tabs[module] = button
+
+        main = tk.Frame(workspace, bg="#d7d7d7")
+        main.pack(side="left", fill="both", expand=True)
+
+        features = self.panel(main)
+        features.pack(side="left", fill="y", padx=(0, 5))
+        features.configure(width=166)
+        features.pack_propagate(False)
+        tk.Label(features, text="ФУНКЦИИ БЛОКА", font=("Segoe UI", 10, "bold"),
+                 bg="#f4f4f6", anchor="w").pack(fill="x", padx=5, pady=(5, 2))
+        self.features_hint = tk.Label(features, text="Функции каталога",
+                 font=("Segoe UI", 8), bg="#f4f4f6", fg="#555555",
+                 wraplength=150, justify="left", anchor="w")
+        self.features_hint.pack(fill="x", padx=5, pady=(0, 4))
+        self.feature_panel = tk.Frame(features, bg="#f4f4f6")
+        self.feature_panel.pack(fill="both", expand=True, padx=3, pady=(0, 3))
+
+        hex_panel = self.panel(main)
+        hex_panel.pack(side="left", fill="both", expand=True)
+        tk.Label(hex_panel, text="AS-BUILT / HEX", font=("Segoe UI", 10, "bold"),
+                 bg="#f4f4f6", anchor="w").pack(fill="x", padx=5, pady=(5, 3))
+        grid = tk.Frame(hex_panel, bg="#f4f4f6")
+        grid.pack(fill="both", expand=True, padx=4, pady=(0, 4))
         self.table = HexTable(grid)
         self.table.pack(fill="both", expand=True)
 
@@ -1307,7 +1317,8 @@ class WindowsConfig(tk.Tk):
                                  fg="#222222", selectcolor="#f4f4f6",
                                  font=("Segoe UI", 10),
                                  command=lambda f=feature, v=var: self.toggle_feature(f, v))
-            box.grid(row=i // 3, column=i % 3, sticky="w", padx=6, pady=1)
+            box.grid(row=i, column=0, sticky="w", padx=2, pady=2)
+            box.configure(wraplength=140, justify="left", anchor="w")
             if value is None:
                 box.configure(state="disabled")
 
