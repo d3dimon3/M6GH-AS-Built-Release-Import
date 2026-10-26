@@ -25,6 +25,80 @@ MODULES = {"IC": "720", "BCM": "726", "RKE": "731", "ABS": "760", "AFS": "737"}
 ROW_PATTERN = re.compile(r"(?<![A-Za-z0-9])([0-9A-Fa-f]{3}-[0-9A-Fa-f]{2}-[0-9A-Fa-f]{2})\s+((?:[0-9A-Fa-f]{2,4}[ \t]+)*[0-9A-Fa-f]{2,4})(?![A-Za-z0-9])")
 
 
+
+class HexTable(tk.Frame):
+    """Fixed-size HEX grid with per-character active-feature highlighting."""
+    def __init__(self, parent):
+        super().__init__(parent, bg="#d6d6db", bd=1, relief="solid")
+        self.highlights = {}
+        header = tk.Frame(self, bg="#e7e7eb")
+        header.pack(fill="x")
+        for title, width in (("Адрес строки", 25), ("Значение HEX", 43)):
+            tk.Label(header, text=title, width=width, bg="#e7e7eb",
+                     font=("Segoe UI", 11, "bold")).pack(side="left", fill="x", expand=True, pady=4)
+        self.body = tk.Frame(self, bg="white")
+        self.body.pack(fill="both", expand=True)
+        self.items = []
+
+    def heading(self, *args, **kwargs):
+        pass
+
+    def column(self, *args, **kwargs):
+        pass
+
+    def tag_configure(self, *args, **kwargs):
+        pass
+
+    def get_children(self):
+        return tuple(range(len(self.items)))
+
+    def delete(self, *items):
+        for child in self.body.winfo_children():
+            child.destroy()
+        self.items.clear()
+
+    def insert(self, parent, position, values, tags=()):
+        address, value = values
+        self.items.append(values)
+        row = tk.Frame(self.body, bg="white")
+        row.pack(fill="x")
+        tk.Label(row, text=address, width=25, bg="white", fg="#222222",
+                 font=("Consolas", 12)).pack(side="left", fill="x", expand=True, pady=3)
+        text = tk.Text(row, height=1, width=43, bg="white", fg="#3b3b3b",
+                       font=("Consolas", 12), relief="flat", bd=0,
+                       highlightthickness=0, wrap="none", cursor="arrow")
+        text.pack(side="left", fill="x", expand=True)
+        text.insert("1.0", value)
+        text.tag_configure("active", foreground="#c81930", font=("Consolas", 12, "bold"))
+        raw_index = 0
+        for column, char in enumerate(value):
+            if char != " ":
+                if raw_index in self.highlights.get(address, set()):
+                    text.tag_add("active", f"1.{column}", f"1.{column + 1}")
+                raw_index += 1
+        text.configure(state="disabled")
+        return len(self.items) - 1
+
+
+def active_hex_positions(features, address, value):
+    """Highlight enabled feature bits/nibbles only; never highlight checksum."""
+    from feature_engine import indices, norm
+    active = set()
+    raw = norm(value)
+    for feature in features:
+        if feature.address != address or not FeatureEngine.state(feature, value):
+            continue
+        try:
+            if feature.mode.upper() == "HEX":
+                active.update(i for i in indices(feature.indices) if i < len(raw) - 2)
+            elif feature.mode.upper() == "BITS":
+                p = feature.byte_index * 2
+                active.update(i for i in (p, p + 1) if i < len(raw) - 2)
+        except (ValueError, IndexError):
+            continue
+    return active
+
+
 class WindowsConfig(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -102,10 +176,11 @@ class WindowsConfig(tk.Tk):
         root.pack(fill="both", expand=True)
 
         heading = tk.Label(root, text="M6GH AS-BUILT CONFIG", bg="#d7d7d7",
-                           fg="#202020", font=("Segoe UI", 20, "bold"))
+                           fg="#202020", font=("Segoe UI", 17, "bold"))
         top = tk.Frame(root, bg="#d7d7d7")
         top.pack(fill="x", pady=(0, 5))
-        heading.pack(in_=top, side="left")
+        top.lift()
+        heading.pack(side="left", anchor="w")
         helpbar = tk.Frame(top, bg="#d7d7d7")
         helpbar.pack(side="right")
         for caption, callback in (("FAQ", self.show_faq), ("О программе", self.show_about)):
@@ -117,7 +192,7 @@ class WindowsConfig(tk.Tk):
         tabbar.pack(fill="x", pady=(0, 6))
         for module in MODULES:
             button = tk.Button(tabbar, text=module, font=("Segoe UI", 12, "bold"),
-                               relief="flat", padx=14, pady=5,
+                               relief="raised", bd=2, padx=14, pady=5,
                                command=lambda m=module: self.select_module(m))
             button.pack(side="left", fill="x", expand=True, padx=3, pady=3)
             self.tabs[module] = button
@@ -139,9 +214,9 @@ class WindowsConfig(tk.Tk):
                       font=("Segoe UI", 12, "bold"), padx=16, pady=7,
                       bg="#f4f4f6", activebackground="#e8e8ec").pack(
                           side="left", fill="x", expand=True, padx=4)
-        self.status = tk.Label(root, text="Перед изменением сохраняйте резервную копию исходного ABT",
-                               bg="#f4f4f6", fg="#202020", font=("Segoe UI", 11, "bold"),
-                               anchor="w", padx=12, pady=7,
+        self.status = tk.Label(root, wraplength=810, text="Перед изменением сохраняйте резервную копию исходного ABT",
+                               bg="#f4f4f6", fg="#202020", font=("Segoe UI", 9),
+                               anchor="w", padx=8, pady=5,
                                highlightbackground="#b61d31", highlightthickness=2)
         self.status.pack(side="bottom", fill="x", pady=(0, 5))
         main = self.panel(root)
@@ -159,16 +234,8 @@ class WindowsConfig(tk.Tk):
 
         grid = tk.Frame(main, bg="#f4f4f6")
         grid.pack(fill="both", expand=True, padx=14, pady=(0, 12))
-        style = ttk.Style(self)
-        style.configure("M6GH.Treeview", font=("Consolas", 12), rowheight=27)
-        style.configure("M6GH.Treeview.Heading", font=("Segoe UI", 12, "bold"))
-        self.table = ttk.Treeview(grid, columns=("address", "value"), show="headings", style="M6GH.Treeview")
-        self.table.heading("address", text="Адрес строки")
-        self.table.heading("value", text="Значение HEX")
-        self.table.column("address", width=240, minwidth=190, stretch=True, anchor="center")
-        self.table.column("value", width=510, stretch=True, anchor="center")
-        self.table.tag_configure("changed", foreground="#c81930")
-        self.table.pack(side="left", fill="both", expand=True)
+        self.table = HexTable(grid)
+        self.table.pack(fill="both", expand=True)
 
         self.select_module("IC")
 
@@ -176,17 +243,21 @@ class WindowsConfig(tk.Tk):
         self.active_module = module
         for name, button in self.tabs.items():
             selected = name == module
-            button.configure(bg="#c81930" if selected else "#f4f4f6",
+            button.configure(bg="#c81930" if selected else "#c5c5cb",
                              fg="white" if selected else "#161616",
                              activebackground="#a81629" if selected else "#e8e8ec")
         self.module_label.configure(text=f"{module}: {('Instrument Cluster' if module == 'IC' else module)}")
         prefix = MODULES[module]
         self.module_details.configure(text=f"ID: {prefix or '—'}  |  Ver: {'ABT загружен' if self.raw_file else 'Образец'}")
         self.table.delete(*self.table.get_children())
+        self.table.highlights = {}
         shown = 0
         for address, value in self.rows:
             if prefix is not None and address.startswith(prefix + "-"):
-                self.table.insert("", "end", values=(address, self.preview_rows.get(address, value)), tags=("changed",) if self.preview_rows.get(address, value) != value else ())
+                current = self.preview_rows.get(address, value)
+                relevant = [f for f in self.features if f.module == module]
+                self.table.highlights[address] = active_hex_positions(relevant, address, current)
+                self.table.insert("", "end", values=(address, current))
                 shown += 1
         self.render_features()
         self.status.configure(text=f"{module}: строк {shown}. HEX — просмотр изменений; сохраняйте новый ABT.")
