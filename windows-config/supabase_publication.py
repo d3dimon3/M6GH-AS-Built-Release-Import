@@ -54,7 +54,7 @@ def parse_and_verify(row: dict[str, Any]) -> VerifiedPublication:
     if not isinstance(snapshot, dict):
         raise ValueError("Invalid snapshot structure")
     # Signature is verified over the EXACT publisher payload, before any application.
-    message = f"MAZDA6GH-SETTINGS-V2\\n{version}\\n{raw}".replace("\\n", "\n").encode("utf-8")
+    message = ("MAZDA6GH-SETTINGS-V2" + chr(10) + str(version) + chr(10) + raw).encode("utf-8")
     key = serialization.load_der_public_key(base64.b64decode(CATALOG_PUBLIC_KEY_BASE64, validate=True))
     try:
         key.verify(base64.b64decode(signature, validate=True), message,
