@@ -365,7 +365,7 @@ class WindowsConfig(tk.Tk):
             pages[title] = page
         features_page = pages["Функции и биты"]
         columns = ("Блок", "Функция", "Адрес", "Режим", "ON", "OFF")
-        tree = ttk.Treeview(features_page, columns=columns, show="headings", height=17)
+        tree = ttk.Treeview(features_page, columns=columns, show="headings", height=8)
         for column in columns:
             tree.heading(column, text=column)
             tree.column(column, width=100 if column != "Функция" else 180)
@@ -374,6 +374,94 @@ class WindowsConfig(tk.Tk):
             tree.insert("", "end", values=(feature.module, feature.label, feature.address, feature.mode, feature.on, feature.off))
         tk.Label(features_page, text="Каталог из подписанной публикации. Редактирование и отправка на сервер пока не включены.",
                  bg="#f4f4f6", fg="#8a2534", wraplength=700).pack(pady=10)
+        editor = tk.Frame(features_page, bg="#f4f4f6")
+        editor.pack(fill="x", padx=8)
+        fields = ("module", "label", "address", "mode", "indices", "on", "off", "byte_index")
+        inputs = {}
+        for i, field in enumerate(fields):
+            tk.Label(editor, text=field, bg="#f4f4f6").grid(row=(i // 4) * 2, column=i % 4)
+            entry = tk.Entry(editor, width=19)
+            entry.grid(row=(i // 4) * 2 + 1, column=i % 4, padx=4)
+            inputs[field] = entry
+        selected = [None]
+        def refresh_editor():
+            tree.delete(*tree.get_children())
+            for f in self.features:
+                tree.insert("", "end", values=(f.module, f.label, f.address, f.mode, f.on, f.off), tags=(f.id,))
+            self.engine = FeatureEngine()
+            for f in self.features:
+                original = next((v for a, v in self.rows if a == f.address), None)
+                if original is not None:
+                    self.engine.seed(f, self.engine.state(f, original))
+            self.select_module(self.active_module)
+        def pick(event=None):
+            selection = tree.selection()
+            if not selection:
+                return
+            tags = tree.item(selection[0], "tags")
+            if not tags:
+                return
+            selected[0] = tags[0]
+            f = next((f for f in self.features if f.id == selected[0]), None)
+            if f:
+                for field in fields:
+                    inputs[field].delete(0, "end")
+                    inputs[field].insert(0, str(getattr(f, field)))
+        tree.bind("<<TreeviewSelect>>", pick)
+        def save_local():
+            from dataclasses import replace
+            from feature_engine import indices, norm
+            import uuid
+            try:
+                values = {field: inputs[field].get().strip() for field in fields}
+                values["module"] = values["module"].upper()
+                values["address"] = values["address"].upper()
+                values["mode"] = values["mode"].upper()
+                values["byte_index"] = int(values["byte_index"] or "0")
+                if values["module"] not in MODULES or not MODULES[values["module"]]:
+                    raise ValueError("Неизвестный блок")
+                if not re.fullmatch(r"[0-9A-F]{3}-[0-9]{2}-[0-9]{2}", values["address"]):
+                    raise ValueError("Неверный адрес AS-Built")
+                if not values["address"].startswith(MODULES[values["module"]] + "-"):
+                    raise ValueError("Адрес не соответствует блоку")
+                positions = indices(values["indices"])
+                if not positions or values["byte_index"] < 0:
+                    raise ValueError("Неверные позиции")
+                if values["mode"] == "HEX":
+                    if len(positions) != len(norm(values["on"])) or len(positions) != len(norm(values["off"])):
+                        raise ValueError("Количество HEX-позиций должно совпадать с ON и OFF")
+                elif values["mode"] != "BITS" or any(p > 7 for p in positions):
+                    raise ValueError("Неверные позиции BITS")
+                previous = next((f for f in self.features if f.id == selected[0]), None)
+                candidate = replace(previous, **values) if previous else Feature(
+                    id="local-" + uuid.uuid4().hex[:12], **values)
+                if previous:
+                    self.features[self.features.index(previous)] = candidate
+                else:
+                    self.features.append(candidate)
+                selected[0] = candidate.id
+                refresh_editor()
+                self.status.configure(text="Админка: изменения применены локально, сервер не затронут.")
+            except (ValueError, TypeError) as exc:
+                messagebox.showerror("Редактор", str(exc), parent=dialog)
+        def new_local():
+            selected[0] = None
+            tree.selection_remove(tree.selection())
+            for field in fields:
+                inputs[field].delete(0, "end")
+            inputs["module"].insert(0, self.active_module)
+            inputs["mode"].insert(0, "HEX")
+            inputs["byte_index"].insert(0, "0")
+        def delete_local():
+            if selected[0] and messagebox.askyesno("Удалить", "Удалить функцию локально?", parent=dialog):
+                self.features = [f for f in self.features if f.id != selected[0]]
+                selected[0] = None
+                refresh_editor()
+        controls = tk.Frame(features_page, bg="#f4f4f6")
+        controls.pack()
+        for label, callback in (("Новая", new_local), ("Сохранить", save_local), ("Удалить", delete_local)):
+            tk.Button(controls, text=label, command=callback).pack(side="left", padx=4)
+        refresh_editor()
         def export_catalog():
             destination = filedialog.asksaveasfilename(parent=dialog, title="Сохранить каталог функций",
                 defaultextension=".json", filetypes=[("JSON", "*.json")])
