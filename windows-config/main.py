@@ -175,12 +175,11 @@ class WindowsConfig(tk.Tk):
         root = tk.Frame(self, bg="#d7d7d7", padx=18, pady=16)
         root.pack(fill="both", expand=True)
 
-        heading = tk.Label(root, text="M6GH AS-BUILT CONFIG", bg="#d7d7d7",
-                           fg="#202020", font=("Segoe UI", 17, "bold"))
-        top = tk.Frame(root, bg="#d7d7d7")
+        top = tk.Frame(root, bg="#d7d7d7", height=46)
         top.pack(fill="x", pady=(0, 5))
-        top.lift()
-        heading.pack(in_=top, side="left", anchor="w")
+        heading = tk.Label(top, text="M6GH AS-BUILT CONFIG", bg="#d7d7d7",
+                           fg="#202020", font=("Segoe UI", 17, "bold"))
+        heading.pack(side="left", anchor="w", padx=(2, 0), pady=(4, 4))
         helpbar = tk.Frame(top, bg="#d7d7d7")
         helpbar.pack(side="right")
         for caption, callback in (("FAQ", self.show_faq), ("О программе", self.show_about)):
