@@ -353,9 +353,44 @@ class WindowsConfig(tk.Tk):
         login.focus_set()
         dialog.grab_set()
 
+    def restore_admin_draft(self):
+        """Restore the admin-only local draft after online catalog loading."""
+        path = Path.home() / ".m6gh_asbuilt_config" / "windows_admin_draft.json"
+        if not path.exists():
+            return
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if data.get("format") != "m6gh-windows-admin-draft-v1":
+                raise ValueError("Неверный формат")
+            features = [Feature(**item) for item in data["features"]]
+            visible = set(data["visible_modules"]) & set(MODULES)
+            heading = data["heading"]
+            faq = data["faq"]
+            extra = {(m, a) for m, a in data["extra_rows"]
+                     if m in MODULES and re.fullmatch(r"[0-9A-F]{3}-[0-9]{2}-[0-9]{2}", a)
+                     and a.startswith(MODULES[m] + "-")}
+            if not visible or not isinstance(heading, str) or not 1 <= len(heading) <= 45 or not isinstance(faq, list):
+                raise ValueError("Некорректные настройки")
+        except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+            messagebox.showwarning("Черновик админки", "Не удалось восстановить настройки: " + str(exc))
+            return
+        self.features = features
+        self.admin_visible_modules = visible
+        self.admin_extra_rows = extra
+        self.admin_heading = heading
+        self.faq_entries = faq
+        self.heading_label.configure(text=heading)
+        for module, button in self.tabs.items():
+            if module in visible:
+                button.pack(side="left", fill="x", expand=True, padx=3, pady=3)
+            else:
+                button.pack_forget()
+        self.select_module(self.active_module if self.active_module in visible else next(m for m in MODULES if m in visible))
+
     def show_admin_panel(self):
         if not self.admin_authenticated:
             return
+        self.restore_admin_draft()
         dialog = tk.Toplevel(self)
         dialog.title("Администрирование интерфейса — Windows")
         self.center_dialog(dialog, 790, 610)
