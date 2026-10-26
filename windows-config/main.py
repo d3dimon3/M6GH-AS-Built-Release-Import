@@ -150,7 +150,8 @@ class WindowsConfig(tk.Tk):
             self._build()
             self.deiconify()
             self.after(100, self.load_cached_settings)
-            self.after(500, self.refresh_online_silent)
+            self.after(200, self.restore_admin_draft)
+            # Windows admin operates locally; no remote refresh can overwrite edits.
             return
         dialog = tk.Toplevel(self)
         dialog.title("Активация M6GH AS-Built Config")
@@ -357,6 +358,27 @@ class WindowsConfig(tk.Tk):
         login.focus_set()
         dialog.grab_set()
 
+    def save_admin_draft_file(self):
+        """Persist edits immediately, not only when the admin window closes."""
+        folder = Path.home() / ".m6gh_asbuilt_config"
+        folder.mkdir(parents=True, exist_ok=True)
+        destination = folder / "windows_admin_draft.json"
+        data = {
+            "format": "m6gh-windows-admin-draft-v1",
+            "features": [dict(id=f.id, module=f.module, address=f.address,
+                              mode=f.mode, indices=f.indices, on=f.on, off=f.off,
+                              byte_index=f.byte_index, label=f.label) for f in self.features],
+            "extra_rows": [list(item) for item in sorted(self.admin_extra_rows)],
+            "visible_modules": sorted(self.admin_visible_modules),
+            "heading": self.admin_heading,
+            "faq": self.faq_entries,
+            "open_caption": self.admin_open_caption,
+            "save_caption": self.admin_save_caption,
+        }
+        temporary = destination.with_suffix(".tmp")
+        temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        temporary.replace(destination)
+
     def restore_admin_draft(self):
         """Restore the admin-only local draft after online catalog loading."""
         path = Path.home() / ".m6gh_asbuilt_config" / "windows_admin_draft.json"
@@ -387,6 +409,10 @@ class WindowsConfig(tk.Tk):
         for button, caption in zip(self.action_buttons, (self.admin_open_caption, self.admin_save_caption)):
             button.configure(text=caption)
         self.faq_entries = faq
+        self.admin_open_caption = str(data.get("open_caption", self.admin_open_caption))
+        self.admin_save_caption = str(data.get("save_caption", self.admin_save_caption))
+        for button, caption in zip(self.action_buttons, (self.admin_open_caption, self.admin_save_caption)):
+            button.configure(text=caption)
         self.heading_label.configure(text=heading)
         for module, button in self.tabs.items():
             if module in visible:
@@ -500,8 +526,8 @@ class WindowsConfig(tk.Tk):
                     self.features.append(candidate)
                 selected[0] = candidate.id
                 refresh_editor()
-                messagebox.showinfo("Функции и биты", "Функция сохранена в локальном каталоге: " + candidate.label, parent=dialog)
-                messagebox.showinfo("Функция сохранена", "Функция добавлена или изменена в локальном каталоге.", parent=dialog)
+                self.save_admin_draft_file()
+                messagebox.showinfo("Функции и биты", "Функция сохранена: " + candidate.label, parent=dialog)
                 self.status.configure(text="Админка: изменения применены локально, сервер не затронут.")
             except Exception as exc:
                 messagebox.showerror("Редактор", "Не удалось сохранить функцию: " + str(exc), parent=dialog)
@@ -518,6 +544,7 @@ class WindowsConfig(tk.Tk):
                 self.features = [f for f in self.features if f.id != selected[0]]
                 selected[0] = None
                 refresh_editor()
+                self.save_admin_draft_file()
         controls = tk.Frame(features_page, bg="#f4f4f6")
         controls.pack()
         for label, callback in (("Добавить новую", new_local), ("Добавить / изменить", save_local), ("Удалить", delete_local)):
@@ -641,7 +668,8 @@ class WindowsConfig(tk.Tk):
             self.heading_label.configure(text=self.admin_heading)
             for button, caption in zip(self.action_buttons, (self.admin_open_caption, self.admin_save_caption)):
                 button.configure(text=caption)
-            messagebox.showinfo("Оформление", "Надписи применены. Закройте админку для сохранения.", parent=dialog)
+            self.save_admin_draft_file()
+            messagebox.showinfo("Оформление", "Надписи сохранены локально.", parent=dialog)
         tk.Button(appearance, text="Сохранить оформление", command=apply_appearance).pack(pady=15)
         faq_page = pages["FAQ"]
         tk.Label(faq_page, text="Редактор FAQ (локально)", font=("Segoe UI", 14, "bold"),
