@@ -64,7 +64,7 @@ def parse_and_verify(row: dict[str, Any]) -> VerifiedPublication:
     return VerifiedPublication(version, snapshot)
 
 
-def download_verified(project_url: str, publishable_key: str) -> VerifiedPublication:
+def download_verified_row(project_url: str, publishable_key: str) -> dict:
     if not re.fullmatch(r"https://[a-z0-9-]+\\.supabase\\.co/?", project_url):
         raise ValueError("Invalid Supabase URL")
     if not publishable_key.startswith("sb_publishable_"):
@@ -84,4 +84,9 @@ def download_verified(project_url: str, publishable_key: str) -> VerifiedPublica
     rows = json.loads(raw)
     if not isinstance(rows, list) or len(rows) != 1:
         raise ValueError("No published configuration")
-    return parse_and_verify(rows[0])
+    parse_and_verify(rows[0])
+    return rows[0]
+
+
+def download_verified(project_url: str, publishable_key: str) -> VerifiedPublication:
+    return parse_and_verify(download_verified_row(project_url, publishable_key))
