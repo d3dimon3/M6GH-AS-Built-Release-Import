@@ -5,6 +5,8 @@ Python 3.10+, standard library only. No vehicle writes or network publishing.
 from __future__ import annotations
 
 import re
+import hashlib
+import hmac
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
@@ -126,6 +128,8 @@ class WindowsConfig(tk.Tk):
         self.preview_rows: dict[str, str] = {}
         self.loaded_module: str | None = None
         self.faq_entries = []
+        self.admin_unlocked = False
+        self.admin_authenticated = False
         self.catalog_version = None
         self.withdraw()
         self.after(100, self.enforce_license)
@@ -190,11 +194,13 @@ class WindowsConfig(tk.Tk):
         heading.pack(side="left", anchor="w", padx=(2, 0), pady=(4, 4))
         helpbar = tk.Frame(top, bg="#d7d7d7")
         helpbar.pack(side="right")
+        self.helpbar = helpbar
         for caption, callback in (("FAQ", self.show_faq), ("О программе", self.show_about)):
             tk.Button(helpbar, text=caption, command=callback, bg="#f4f4f6",
                       highlightbackground="#b61d31", highlightthickness=2,
                       font=("Segoe UI", 10, "bold"), padx=12, pady=3).pack(side="left", padx=4)
 
+        self.admin_button = tk.Button(helpbar, text="Админ-панель", command=self.show_admin_login, bg="#c81930", fg="white", font=("Segoe UI", 10, "bold"))
         tabbar = self.panel(root)
         tabbar.pack(fill="x", pady=(0, 6))
         for module in MODULES:
@@ -276,6 +282,9 @@ class WindowsConfig(tk.Tk):
             return
         try:
             raw = Path(name).read_bytes()
+            if Path(name).suffix.lower() == ".key":
+                self.unlock_admin_key(raw)
+                return
             if len(raw) > 2_000_000:
                 raise ValueError("Файл слишком большой")
             content = raw.decode("utf-8-sig") if not raw.startswith(b"\xff\xfe") else raw.decode("utf-16")
@@ -295,6 +304,88 @@ class WindowsConfig(tk.Tk):
             self.status.configure(text=f"Загружен {self.source_path.name}: {len(matches)} строк. Изменения можно сохранить в новый ABT.")
         except (OSError, UnicodeError, ValueError) as exc:
             messagebox.showerror("Ошибка открытия ABT", str(exc))
+
+    def unlock_admin_key(self, raw):
+        # Compatibility with the owner's historical admin key. This is an
+        # exact-file compatibility check, not a cryptographic signature scheme.
+        expected = "73c58455bbe288de332228b8169a630d6254a9c129930c73268b9e42d6d313ea"
+        valid = raw.strip().startswith(b"MAZDA6GH-ADMIN-V1\\n") and hmac.compare_digest(
+            hashlib.sha256(raw.strip()).hexdigest(), expected)
+        if not valid:
+            messagebox.showerror("Админ-ключ", "Ключ администратора не распознан.")
+            return
+        self.admin_unlocked = True
+        self.show_admin_login()
+
+    def show_admin_login(self):
+        if not self.admin_unlocked:
+            return
+        if self.admin_authenticated:
+            self.show_admin_panel()
+            return
+        dialog = tk.Toplevel(self)
+        dialog.title("Вход в админ-панель")
+        self.center_dialog(dialog, 390, 240)
+        dialog.resizable(False, False)
+        tk.Label(dialog, text="Авторизация администратора", font=("Segoe UI", 14, "bold")).pack(pady=15)
+        tk.Label(dialog, text="Логин").pack()
+        login = tk.Entry(dialog, width=35)
+        login.pack()
+        tk.Label(dialog, text="Пароль").pack()
+        password = tk.Entry(dialog, width=35, show="*")
+        password.pack()
+        def submit():
+            # Historical Windows V7.1 credential hash; no credentials in server calls.
+            old_hash = "PLACEHOLDER_LEGACY_HASH"
+            if login.get() == "admin" and hmac.compare_digest(hashlib.sha256(password.get().encode()).hexdigest(), old_hash):
+                self.admin_authenticated = True
+                self.admin_button.pack(side="left", padx=4, before=self.helpbar.winfo_children()[0])
+                dialog.destroy()
+                self.show_admin_panel()
+            else:
+                messagebox.showerror("Админ-панель", "Неверный логин или пароль", parent=dialog)
+        tk.Button(dialog, text="Войти", command=submit, bg="#c81930", fg="white").pack(pady=12)
+        password.bind("<Return>", lambda event: submit())
+        login.focus_set()
+        dialog.grab_set()
+
+    def show_admin_panel(self):
+        if not self.admin_authenticated:
+            return
+        dialog = tk.Toplevel(self)
+        dialog.title("Администрирование интерфейса — Windows")
+        self.center_dialog(dialog, 790, 610)
+        dialog.resizable(False, False)
+        tabs = ttk.Notebook(dialog)
+        tabs.pack(fill="both", expand=True, padx=12, pady=12)
+        pages = {}
+        for title in ("Функции и биты", "Строки AS-Built", "Блоки и доступ", "Оформление", "FAQ"):
+            page = tk.Frame(tabs, bg="#f4f4f6")
+            tabs.add(page, text=title)
+            pages[title] = page
+        features_page = pages["Функции и биты"]
+        columns = ("Блок", "Функция", "Адрес", "Режим", "ON", "OFF")
+        tree = ttk.Treeview(features_page, columns=columns, show="headings", height=17)
+        for column in columns:
+            tree.heading(column, text=column)
+            tree.column(column, width=100 if column != "Функция" else 180)
+        tree.pack(fill="both", expand=True, padx=8, pady=8)
+        for feature in self.features:
+            tree.insert("", "end", values=(feature.module, feature.label, feature.address, feature.mode, feature.on, feature.off))
+        tk.Label(features_page, text="Каталог из подписанной публикации. Редактирование и отправка на сервер пока не включены.",
+                 bg="#f4f4f6", fg="#8a2534", wraplength=700).pack(pady=10)
+        rows_page = pages["Строки AS-Built"]
+        tk.Label(rows_page, text="Загруженные строки выбранного блока", bg="#f4f4f6",
+                 font=("Segoe UI", 12, "bold")).pack(pady=12)
+        for address, value in self.rows[:20]:
+            tk.Label(rows_page, text=f"{address}    {self.preview_rows.get(address, value)}",
+                     bg="#f4f4f6", font=("Consolas", 11)).pack(anchor="w", padx=24)
+        for title in ("Блоки и доступ", "Оформление", "FAQ"):
+            page = pages[title]
+            tk.Label(page, text=title, font=("Segoe UI", 15, "bold"), bg="#f4f4f6").pack(pady=25)
+            tk.Label(page, text="Раздел восстановлен в интерфейсе. Редактирование и публикация будут подключены на следующем этапе.",
+                     bg="#f4f4f6", wraplength=650).pack()
+        tk.Button(dialog, text="Закрыть", command=dialog.destroy).pack(pady=(0, 10))
 
     def load_cached_settings(self):
         try:
