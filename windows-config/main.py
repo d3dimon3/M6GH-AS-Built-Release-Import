@@ -132,6 +132,7 @@ class WindowsConfig(tk.Tk):
         self.admin_authenticated = False
         self.admin_extra_rows = set()
         self.admin_visible_modules = set(MODULES)
+        self.admin_module_info = {m: {"name": m, "version": ""} for m in MODULES}
         self.admin_heading = "M6GH AS-BUILT CONFIG"
         self.admin_open_caption = "Открыть ABT"
         self.admin_save_caption = "Сохранить ABT"
@@ -272,9 +273,10 @@ class WindowsConfig(tk.Tk):
             button.configure(bg="#c81930" if selected else "#c5c5cb",
                              fg="white" if selected else "#161616",
                              activebackground="#a81629" if selected else "#e8e8ec")
-        self.module_label.configure(text=f"{module}: {('Instrument Cluster' if module == 'IC' else module)}")
+        info = self.admin_module_info.get(module, {})
+        self.module_label.configure(text=f"{module}: {info.get('name') or module}")
         prefix = MODULES[module]
-        self.module_details.configure(text=f"ID: {prefix or '—'}  |  Ver: {'ABT загружен' if self.raw_file else 'Образец'}")
+        self.module_details.configure(text=f"ID: {prefix or '—'}  |  Ver: {info.get('version') or ('ABT загружен' if self.raw_file else 'Образец')}")
         self.table.delete(*self.table.get_children())
         self.table.highlights = {}
         shown = 0
@@ -374,6 +376,7 @@ class WindowsConfig(tk.Tk):
                               byte_index=f.byte_index, label=f.label) for f in self.features],
             "extra_rows": [list(item) for item in sorted(self.admin_extra_rows)],
             "visible_modules": sorted(self.admin_visible_modules),
+            "module_info": self.admin_module_info,
             "heading": self.admin_heading,
             "faq": self.faq_entries,
             "open_caption": self.admin_open_caption,
@@ -410,6 +413,15 @@ class WindowsConfig(tk.Tk):
             return
         self.features = features
         self.admin_visible_modules = visible
+        saved_info = data.get("module_info", {})
+        if isinstance(saved_info, dict):
+            for module in MODULES:
+                item = saved_info.get(module)
+                if isinstance(item, dict):
+                    self.admin_module_info[module] = {
+                        "name": str(item.get("name", module))[:70],
+                        "version": str(item.get("version", ""))[:40],
+                    }
         self.admin_extra_rows = extra
         self.admin_heading = heading
         self.admin_open_caption = str(data.get("open_caption", self.admin_open_caption))
@@ -630,29 +642,79 @@ class WindowsConfig(tk.Tk):
                  bg="#f4f4f6", fg="#8a2534").pack(pady=5)
         refresh_rows()
         access_page = pages["Блоки и доступ"]
-        tk.Label(access_page, text="Отображение блоков", font=("Segoe UI", 15, "bold"),
-                 bg="#f4f4f6").pack(pady=20)
-        module_vars = {}
-        for module in MODULES:
-            variable = tk.BooleanVar(value=module in self.admin_visible_modules)
-            module_vars[module] = variable
-            tk.Checkbutton(access_page, text=module, variable=variable, bg="#f4f4f6",
-                           font=("Segoe UI", 12)).pack(anchor="w", padx=80, pady=4)
+        tk.Label(access_page, text="Блоки и доступ", font=("Segoe UI", 16, "bold"),
+                 bg="#f4f4f6").pack(pady=(12, 4))
+        tk.Label(access_page, text="Настройки блоков. HEX-префиксы защищены от случайного изменения.",
+                 bg="#f4f4f6", fg="#555555").pack(pady=(0, 6))
+        holder = tk.Frame(access_page, bg="#f4f4f6")
+        holder.pack(fill="both", expand=True, padx=14)
+        canvas = tk.Canvas(holder, bg="#f4f4f6", highlightthickness=0)
+        scroll = ttk.Scrollbar(holder, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scroll.set)
+        scroll.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        cards = tk.Frame(canvas, bg="#f4f4f6")
+        canvas_window = canvas.create_window((0, 0), window=cards, anchor="nw")
+        cards.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(canvas_window, width=e.width))
+        module_vars, name_entries, version_entries = {}, {}, {}
+        for module, prefix in MODULES.items():
+            info = self.admin_module_info.get(module, {})
+            card = tk.Frame(cards, bg="#ffffff", highlightbackground="#c81930",
+                            highlightthickness=1, padx=12, pady=8)
+            card.pack(fill="x", padx=5, pady=5)
+            header = tk.Frame(card, bg="#ffffff")
+            header.pack(fill="x")
+            tk.Label(header, text=module, bg="#ffffff", fg="#b71930",
+                     font=("Segoe UI", 13, "bold")).pack(side="left")
+            enabled = tk.BooleanVar(value=module in self.admin_visible_modules)
+            module_vars[module] = enabled
+            tk.Checkbutton(header, text="Показывать в Config", variable=enabled,
+                           bg="#ffffff").pack(side="right")
+            form = tk.Frame(card, bg="#ffffff")
+            form.pack(fill="x", pady=(6, 0))
+            for col, (caption, value, editable) in enumerate((
+                ("Название", info.get("name", module), True),
+                ("ID / HEX-адрес", prefix, False),
+                ("Версия", info.get("version", ""), True),
+            )):
+                tk.Label(form, text=caption, bg="#ffffff").grid(row=0, column=col, sticky="w", padx=5)
+                entry = tk.Entry(form, width=24 if col == 0 else 16)
+                entry.insert(0, value)
+                entry.grid(row=1, column=col, sticky="ew", padx=5, pady=3)
+                form.columnconfigure(col, weight=1)
+                if not editable:
+                    entry.configure(state="readonly")
+                elif col == 0:
+                    name_entries[module] = entry
+                else:
+                    version_entries[module] = entry
         def apply_access():
             enabled = {module for module, variable in module_vars.items() if variable.get()}
             if not enabled:
                 messagebox.showerror("Блоки", "Оставьте хотя бы один блок.", parent=dialog)
                 return
+            new_info = {}
+            for module in MODULES:
+                name = name_entries[module].get().strip()
+                version = version_entries[module].get().strip()
+                if not name or len(name) > 70 or len(version) > 40:
+                    messagebox.showerror("Блоки", "Проверьте название и версию блока.", parent=dialog)
+                    return
+                new_info[module] = {"name": name, "version": version}
+            self.admin_module_info = new_info
             self.admin_visible_modules = enabled
             for module, button in self.tabs.items():
                 if module in enabled:
                     button.pack(side="left", fill="x", expand=True, padx=3, pady=3)
                 else:
                     button.pack_forget()
-            if self.active_module not in enabled:
-                self.select_module(next(m for m in MODULES if m in enabled))
-            self.status.configure(text="Отображение блоков изменено локально.")
-        tk.Button(access_page, text="Применить", command=apply_access).pack(pady=15)
+            self.select_module(self.active_module if self.active_module in enabled else next(m for m in MODULES if m in enabled))
+            self.save_admin_draft_file()
+            self.status.configure(text="Карточки блоков сохранены локально.")
+            messagebox.showinfo("Блоки", "Изменения сохранены и восстановятся после перезапуска.", parent=dialog)
+        tk.Button(access_page, text="Сохранить блоки и доступ", command=apply_access,
+                  bg="#c81930", fg="white", font=("Segoe UI", 11, "bold")).pack(pady=12)
         appearance = pages["Оформление"]
         tk.Label(appearance, text="Оформление приложения", font=("Segoe UI", 15, "bold"),
                  bg="#f4f4f6").pack(pady=14)
