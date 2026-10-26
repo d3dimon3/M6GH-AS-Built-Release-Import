@@ -132,6 +132,7 @@ class WindowsConfig(tk.Tk):
         self.admin_authenticated = False
         self.admin_extra_rows = set()
         self.admin_visible_modules = set(MODULES)
+        self.admin_heading = "M6GH AS-BUILT CONFIG"
         self.catalog_version = None
         self.withdraw()
         self.after(100, self.enforce_license)
@@ -194,6 +195,7 @@ class WindowsConfig(tk.Tk):
         heading = tk.Label(top, text="M6GH AS-BUILT CONFIG", bg="#d7d7d7",
                            fg="#202020", font=("Segoe UI", 17, "bold"))
         heading.pack(side="left", anchor="w", padx=(2, 0), pady=(4, 4))
+        self.heading_label = heading
         helpbar = tk.Frame(top, bg="#d7d7d7")
         helpbar.pack(side="right")
         self.helpbar = helpbar
@@ -553,7 +555,23 @@ class WindowsConfig(tk.Tk):
                 self.select_module(next(m for m in MODULES if m in enabled))
             self.status.configure(text="Отображение блоков изменено локально.")
         tk.Button(access_page, text="Применить", command=apply_access).pack(pady=15)
-        for title in ("Оформление", "FAQ"):
+        appearance = pages["Оформление"]
+        tk.Label(appearance, text="Заголовок окна", font=("Segoe UI", 14, "bold"),
+                 bg="#f4f4f6").pack(pady=20)
+        title_input = tk.Entry(appearance, width=46)
+        title_input.insert(0, self.admin_heading)
+        title_input.pack(pady=8)
+        def apply_title():
+            value = title_input.get().strip()
+            if not 1 <= len(value) <= 45:
+                messagebox.showerror("Оформление", "Введите от 1 до 45 символов.", parent=dialog)
+                return
+            self.admin_heading = value
+            self.heading_label.configure(text=value)
+        tk.Button(appearance, text="Применить заголовок", command=apply_title).pack(pady=10)
+        tk.Label(appearance, text="Изменение локальное, до выхода из программы.",
+                 bg="#f4f4f6").pack(pady=8)
+        for title in ("FAQ",):
             page = pages[title]
             tk.Label(page, text=title, font=("Segoe UI", 15, "bold"), bg="#f4f4f6").pack(pady=25)
             tk.Label(page, text="Раздел восстановлен в интерфейсе. Редактирование и публикация будут подключены на следующем этапе.",
