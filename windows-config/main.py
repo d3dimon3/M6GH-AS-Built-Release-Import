@@ -199,10 +199,10 @@ class WindowsConfig(tk.Tk):
         # Fit low-resolution Windows tablets while preserving desktop usability.
         self.update_idletasks()
         screen_w, screen_h = self.winfo_screenwidth(), self.winfo_screenheight()
-        width = min(850, max(480, screen_w - 36))
-        height = min(720, max(420, screen_h - 100))
+        width = min(710, max(480, screen_w - 48))
+        height = min(620, max(420, screen_h - 120))
         self.geometry(f"{width}x{height}")
-        self.minsize(min(600, width), min(440, height))
+        self.minsize(min(480, width), min(420, height))
         self.after_idle(lambda: self.center_dialog(self, width, height, make_transient=False))
         self.configure(bg="#d7d7d7")
         self.active_module = "IC"
@@ -1167,8 +1167,11 @@ class WindowsConfig(tk.Tk):
 
     def center_dialog(self, dialog, width, height, make_transient=True):
         self.update_idletasks()
-        x = self.winfo_rootx() + max(0, (self.winfo_width() - width) // 2)
-        y = self.winfo_rooty() + max(0, (self.winfo_height() - height) // 2)
+        screen_w, screen_h = dialog.winfo_screenwidth(), dialog.winfo_screenheight()
+        # Center on the actual display; reserve space for the Windows taskbar.
+        usable_h = max(height, screen_h - 55)
+        x = max(0, (screen_w - width) // 2)
+        y = max(0, (usable_h - height) // 2)
         dialog.geometry(f"{width}x{height}+{x}+{y}")
         if make_transient:
             dialog.transient(self)
@@ -1225,8 +1228,8 @@ class WindowsConfig(tk.Tk):
         markup = Markup()
         markup.feed(self.admin_about_description)
         markup.close()
-        text.insert("end", "\n\n")
-        text.insert("end", self.admin_warning_title + "\n" + self.admin_warning_text + "\n\n", "warning")
+        text.insert("end", "\n\n\n\n")
+        text.insert("end", self.admin_warning_title + "\n" + self.admin_warning_text + "\n\n\n\n\n", "warning")
         for number, (role, name, link) in enumerate(self.admin_authors):
             text.insert("end", role + ": ")
             if link and link.startswith(("https://", "http://")):
