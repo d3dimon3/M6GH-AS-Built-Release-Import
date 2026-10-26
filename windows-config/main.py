@@ -30,7 +30,8 @@ class WindowsConfig(tk.Tk):
         super().__init__()
         self.title("M6GH AS-Built Config — Windows")
         self.geometry("1060x760")
-        self.minsize(800, 580)
+        self.resizable(False, False)
+        self.after_idle(lambda: self.center_dialog(self, 1060, 760, make_transient=False))
         self.configure(bg="#d7d7d7")
         self.active_module = "IC"
         self.raw_file: bytes | None = None
@@ -102,43 +103,48 @@ class WindowsConfig(tk.Tk):
 
         heading = tk.Label(root, text="M6GH AS-BUILT CONFIG", bg="#d7d7d7",
                            fg="#202020", font=("Segoe UI", 20, "bold"))
-        heading.pack(anchor="w", pady=(0, 12))
-        helpbar = tk.Frame(root, bg="#d7d7d7")
-        helpbar.pack(anchor="e", pady=(0, 8))
-        tk.Button(helpbar, text="FAQ", command=self.show_faq).pack(side="left", padx=4)
-        tk.Button(helpbar, text="О программе", command=self.show_about).pack(side="left", padx=4)
+        top = tk.Frame(root, bg="#d7d7d7")
+        top.pack(fill="x", pady=(0, 5))
+        heading.pack_forget()
+        heading.pack(in_=top, side="left")
+        helpbar = tk.Frame(top, bg="#d7d7d7")
+        helpbar.pack(side="right")
+        for caption, callback in (("FAQ", self.show_faq), ("О программе", self.show_about)):
+            tk.Button(helpbar, text=caption, command=callback, bg="#f4f4f6",
+                      highlightbackground="#b61d31", highlightthickness=2,
+                      font=("Segoe UI", 10, "bold"), padx=12, pady=3).pack(side="left", padx=4)
 
         tabbar = self.panel(root)
-        tabbar.pack(fill="x", pady=(0, 10))
+        tabbar.pack(fill="x", pady=(0, 6))
         for module in MODULES:
             button = tk.Button(tabbar, text=module, font=("Segoe UI", 12, "bold"),
-                               relief="flat", padx=23, pady=12,
+                               relief="flat", padx=14, pady=5,
                                command=lambda m=module: self.select_module(m))
             button.pack(side="left", fill="x", expand=True, padx=3, pady=3)
             self.tabs[module] = button
 
         info = self.panel(root)
-        info.pack(fill="x", pady=(0, 10))
+        info.pack(fill="x", pady=(0, 6))
         self.module_label = tk.Label(info, bg="#f4f4f6", fg="#222222",
                                      font=("Segoe UI", 15, "bold"), anchor="w")
-        self.module_label.pack(fill="x", padx=14, pady=(12, 4))
+        self.module_label.pack(fill="x", padx=14, pady=(5, 1))
         self.module_details = tk.Label(info, bg="#f4f4f6", fg="#666666",
                                        font=("Segoe UI", 11), anchor="w")
-        self.module_details.pack(fill="x", padx=14, pady=(0, 12))
+        self.module_details.pack(fill="x", padx=14, pady=(0, 5))
 
         actions = tk.Frame(root, bg="#d7d7d7")
         actions.pack(side="bottom", fill="x", pady=(4, 0))
         for label, command in (("Открыть ABT", self.open_abt),
                                ("Сохранить копию ABT", self.save_abt)):
             tk.Button(actions, text=label, command=command,
-                      font=("Segoe UI", 12, "bold"), padx=16, pady=12,
+                      font=("Segoe UI", 12, "bold"), padx=16, pady=7,
                       bg="#f4f4f6", activebackground="#e8e8ec").pack(
                           side="left", fill="x", expand=True, padx=4)
         self.status = tk.Label(root, text="Первый этап Windows: просмотр ABT без изменения файла",
                                bg="#f4f4f6", fg="#202020", font=("Segoe UI", 11, "bold"),
-                               anchor="w", padx=12, pady=12,
+                               anchor="w", padx=12, pady=7,
                                highlightbackground="#b61d31", highlightthickness=2)
-        self.status.pack(side="bottom", fill="x", pady=(6, 0))
+        self.status.pack(side="bottom", fill="x", pady=(0, 5), before=actions)
         main = self.panel(root)
         main.pack(fill="both", expand=True, pady=(0, 10))
         tk.Label(main, text="ФУНКЦИИ БЛОКА", font=("Segoe UI", 13, "bold"),
@@ -154,11 +160,14 @@ class WindowsConfig(tk.Tk):
 
         grid = tk.Frame(main, bg="#f4f4f6")
         grid.pack(fill="both", expand=True, padx=14, pady=(0, 12))
-        self.table = ttk.Treeview(grid, columns=("address", "value"), show="headings")
+        style = ttk.Style(self)
+        style.configure("M6GH.Treeview", font=("Consolas", 13), rowheight=32)
+        style.configure("M6GH.Treeview.Heading", font=("Segoe UI", 12, "bold"))
+        self.table = ttk.Treeview(grid, columns=("address", "value"), show="headings", style="M6GH.Treeview")
         self.table.heading("address", text="Адрес строки")
         self.table.heading("value", text="Значение HEX")
-        self.table.column("address", width=210, stretch=False)
-        self.table.column("value", width=650, stretch=True)
+        self.table.column("address", width=250, minwidth=220, stretch=False, anchor="center")
+        self.table.column("value", width=650, stretch=True, anchor="center")
         scrollbar = ttk.Scrollbar(grid, orient="vertical", command=self.table.yview)
         self.table.configure(yscrollcommand=scrollbar.set)
         self.table.tag_configure("changed", foreground="#c81930")
@@ -284,6 +293,7 @@ class WindowsConfig(tk.Tk):
         dialog = tk.Toplevel(self)
         dialog.title("FAQ — M6GH AS-Built Config")
         self.center_dialog(dialog, 700, 540)
+        dialog.resizable(False, False)
         frame = tk.Frame(dialog, bg="#f4f4f6", padx=16, pady=16)
         frame.pack(fill="both", expand=True)
         view = tk.Text(frame, wrap="word", font=("Segoe UI", 11), bg="#f4f4f6")
@@ -301,22 +311,24 @@ class WindowsConfig(tk.Tk):
             view.insert("end", str(item.get("description", "")) + chr(10))
             if item.get("extra_text"):
                 view.insert("end", str(item["extra_text"]) + chr(10))
-            view.insert("end", chr(10) + "─" * 48 + chr(10) * 2)
+            view.insert("end", chr(10) + "─" * 32 + chr(10) * 2)
         view.configure(state="disabled")
 
-    def center_dialog(self, dialog, width, height):
+    def center_dialog(self, dialog, width, height, make_transient=True):
         self.update_idletasks()
         x = self.winfo_rootx() + max(0, (self.winfo_width() - width) // 2)
         y = self.winfo_rooty() + max(0, (self.winfo_height() - height) // 2)
         dialog.geometry(f"{width}x{height}+{x}+{y}")
-        dialog.transient(self)
-        dialog.lift()
-        dialog.focus_force()
+        if make_transient:
+            dialog.transient(self)
+            dialog.lift()
+            dialog.focus_force()
 
     def show_about(self):
         dialog = tk.Toplevel(self)
         dialog.title("О программе — M6GH AS-Built Config")
         self.center_dialog(dialog, 640, 650)
+        dialog.resizable(False, False)
         dialog.configure(bg="#f4f4f6")
         tk.Label(dialog, text="О программе", font=("Segoe UI", 18, "bold"),
                  bg="#f4f4f6").pack(fill="x", pady=(18, 10))
