@@ -13,7 +13,7 @@ The window is wide, with a gray background, red borders, module tabs and local A
 Checkboxes are not shown until the Android configuration engine has been ported and tested.
 Online Supabase signed catalog verification, license activation, embedded admin and ABT editing are **not implemented yet**. Never trust or publish unsigned remote settings.
 
-## Planned next steps
+## Stage 2 — shared feature logic (source port)\n\n`feature_engine.py` ports the Android HEX/BITS toggles, imported ON state, OFF protection, changed positions and checksum. `test_feature_engine.py` contains initial regression tests. These functions are **not yet connected to the Windows UI**, and the tests have not yet been executed on Windows.\n\n## Planned next steps
 
 1. Port and test ABT parsing and the module-specific feature/HEX/BITS rules against Android fixtures.
 2. Port signed Supabase publication verification, using the existing trusted public key.
