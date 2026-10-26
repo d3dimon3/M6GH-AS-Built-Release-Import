@@ -6,12 +6,13 @@ from __future__ import annotations
 
 import re
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 from pathlib import Path
 import json
 import os
 import threading
 from snapshot_mapper import parse_snapshot
+from connection_settings import load_key, save_key
 from abt_codec import parse_checked
 from license_gate import device_id, saved_license_valid, store_license
 from supabase_publication import download_verified_row
@@ -53,6 +54,7 @@ class WindowsConfig(tk.Tk):
             self._build()
             self.deiconify()
             self.after(100, self.load_cached_settings)
+            self.after(500, self.refresh_online_silent)
             return
         dialog = tk.Toplevel(self)
         dialog.title("Активация M6GH AS-Built Config")
@@ -80,6 +82,7 @@ class WindowsConfig(tk.Tk):
             self._build()
             self.deiconify()
             self.after(100, self.load_cached_settings)
+            self.after(500, self.refresh_online_silent)
         tk.Button(dialog, text="АКТИВИРОВАТЬ", command=activate,
                   bg="#c81930", fg="white", font=("Segoe UI", 11, "bold")).pack(pady=4)
         dialog.grab_set()
@@ -220,12 +223,22 @@ class WindowsConfig(tk.Tk):
         except Exception as exc:
             self.status.configure(text="Офлайн-кэш отклонён: " + str(exc)[:120])
 
-    def refresh_online(self):
+    def refresh_online_silent(self):
+        if load_key() or os.environ.get('M6GH_SUPABASE_PUBLISHABLE_KEY'):
+            self.refresh_online(silent=True)
+
+    def refresh_online(self, silent=False):
         # The publishable key is supplied at runtime, never committed to GitHub.
         url = os.environ.get("M6GH_SUPABASE_URL", "https://zyksvoauffhexketcyrq.supabase.co")
-        key = os.environ.get("M6GH_SUPABASE_PUBLISHABLE_KEY", "")
+        key = load_key() or os.environ.get("M6GH_SUPABASE_PUBLISHABLE_KEY", "")
         if not key:
-            messagebox.showinfo("Supabase", "Для первого теста задайте M6GH_SUPABASE_PUBLISHABLE_KEY в Windows.")
+            key = simpledialog.askstring("Подключение Supabase", "Введите публичный ключ Supabase (sb_publishable_...). Он сохранится на этом компьютере.", parent=self)
+            if not key:
+                return
+            try:
+                save_key(key)
+            except ValueError as exc:
+                messagebox.showerror("Supabase", str(exc))
             return
         self.status.configure(text="Проверка подписи и загрузка настроек...")
         def worker():
@@ -234,7 +247,8 @@ class WindowsConfig(tk.Tk):
                 features = parse_snapshot(publication.snapshot)
             except Exception as exc:
                 error = str(exc)
-                self.after(0, lambda: messagebox.showerror("Supabase", error))
+                if not silent:
+                    self.after(0, lambda: messagebox.showerror("Supabase", error))
                 self.after(0, lambda: self.status.configure(text="Обновление отклонено. Настройки не изменены."))
                 return
             def apply():
