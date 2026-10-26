@@ -683,11 +683,39 @@ class WindowsConfig(tk.Tk):
             refresh_faq()
             messagebox.showinfo("Админка", "Черновик загружен. Для обновления вкладок перезапустите админку.", parent=dialog)
 
+        def autosave_admin():
+            try:
+                folder = Path.home() / ".m6gh_asbuilt_config"
+                folder.mkdir(parents=True, exist_ok=True)
+                destination = folder / "windows_admin_draft.json"
+                data = {
+                    "format": "m6gh-windows-admin-draft-v1",
+                    "features": [dict(id=f.id, module=f.module, address=f.address,
+                                      mode=f.mode, indices=f.indices, on=f.on, off=f.off,
+                                      byte_index=f.byte_index, label=f.label) for f in self.features],
+                    "extra_rows": [list(item) for item in sorted(self.admin_extra_rows)],
+                    "visible_modules": sorted(self.admin_visible_modules),
+                    "heading": self.admin_heading,
+                    "faq": self.faq_entries,
+                }
+                temporary = destination.with_suffix(".tmp")
+                temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+                temporary.replace(destination)
+                return True
+            except (OSError, TypeError, ValueError) as exc:
+                messagebox.showerror("Автосохранение", str(exc), parent=dialog)
+                return False
+
+        def close_admin():
+            if autosave_admin():
+                dialog.destroy()
+
+        dialog.protocol("WM_DELETE_WINDOW", close_admin)
         draft_buttons = tk.Frame(dialog)
         draft_buttons.pack(pady=(0, 5))
         tk.Button(draft_buttons, text="Сохранить настройки JSON", command=save_admin_draft).pack(side="left", padx=5)
         tk.Button(draft_buttons, text="Загрузить настройки JSON", command=load_admin_draft).pack(side="left", padx=5)
-        tk.Button(dialog, text="Закрыть", command=dialog.destroy).pack(pady=(0, 10))
+        tk.Button(dialog, text="Закрыть и сохранить", command=close_admin).pack(pady=(0, 10))
 
     def load_cached_settings(self):
         try:
