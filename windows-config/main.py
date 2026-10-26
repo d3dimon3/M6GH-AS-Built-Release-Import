@@ -27,18 +27,19 @@ ROW_PATTERN = re.compile(r"(?<![A-Za-z0-9])([0-9A-Fa-f]{3}-[0-9A-Fa-f]{2}-[0-9A-
 
 
 class HexTable(tk.Frame):
-    """Fixed-size HEX grid with per-character active-feature highlighting."""
+    """Compact bordered HEX rows with character-level active-feature highlighting."""
     def __init__(self, parent):
-        super().__init__(parent, bg="#d6d6db", bd=1, relief="solid")
+        super().__init__(parent, bg="#c4c4cb", bd=1, relief="solid")
         self.highlights = {}
-        header = tk.Frame(self, bg="#e7e7eb")
-        header.pack(fill="x")
-        for title, width in (("Адрес строки", 25), ("Значение HEX", 43)):
-            tk.Label(header, text=title, width=width, bg="#e7e7eb",
-                     font=("Segoe UI", 11, "bold")).pack(side="left", fill="x", expand=True, pady=4)
-        self.body = tk.Frame(self, bg="white")
-        self.body.pack(fill="both", expand=True)
         self.items = []
+        header = tk.Frame(self, bg="#dedee3")
+        header.pack(fill="x")
+        for title, width in (("Адрес строки", 22), ("Значение HEX", 37)):
+            tk.Label(header, text=title, width=width, bg="#dedee3",
+                     font=("Segoe UI", 10, "bold"), anchor="center").pack(
+                         side="left", fill="x", expand=True, pady=3)
+        self.body = tk.Frame(self, bg="#c4c4cb")
+        self.body.pack(fill="both", expand=True)
 
     def heading(self, *args, **kwargs):
         pass
@@ -60,16 +61,23 @@ class HexTable(tk.Frame):
     def insert(self, parent, position, values, tags=()):
         address, value = values
         self.items.append(values)
-        row = tk.Frame(self.body, bg="white")
-        row.pack(fill="x")
-        tk.Label(row, text=address, width=25, bg="white", fg="#222222",
-                 font=("Consolas", 12)).pack(side="left", fill="x", expand=True, pady=3)
-        text = tk.Text(row, height=1, width=43, bg="white", fg="#3b3b3b",
-                       font=("Consolas", 12), relief="flat", bd=0,
-                       highlightthickness=0, wrap="none", cursor="arrow")
-        text.pack(side="left", fill="x", expand=True)
+        row = tk.Frame(self.body, bg="#c4c4cb")
+        row.pack(fill="x", pady=(0, 1))
+        address_cell = tk.Frame(row, bg="#f0f0f2", bd=1, relief="solid")
+        address_cell.pack(side="left", fill="both", expand=True, padx=(0, 1))
+        tk.Label(address_cell, text=address, width=22, bg="#f0f0f2",
+                 fg="#222222", font=("Consolas", 11, "bold"),
+                 anchor="center", pady=1).pack(fill="x")
+        value_cell = tk.Frame(row, bg="#f0f0f2", bd=1, relief="solid")
+        value_cell.pack(side="left", fill="both", expand=True)
+        text = tk.Text(value_cell, height=1, width=37, bg="#f0f0f2",
+                       fg="#3b3b3b", font=("Consolas", 11), relief="flat",
+                       bd=0, padx=5, pady=1, highlightthickness=0,
+                       wrap="none", cursor="arrow")
+        text.pack(fill="x")
         text.insert("1.0", value)
-        text.tag_configure("active", foreground="#c81930", font=("Consolas", 12, "bold"))
+        text.tag_configure("active", foreground="#c81930",
+                           font=("Consolas", 11, "bold"))
         raw_index = 0
         for column, char in enumerate(value):
             if char != " ":
