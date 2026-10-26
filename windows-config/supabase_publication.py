@@ -65,7 +65,7 @@ def parse_and_verify(row: dict[str, Any]) -> VerifiedPublication:
 
 
 def download_verified_row(project_url: str, publishable_key: str) -> dict:
-    if not re.fullmatch(r"https://[a-z0-9-]+\\.supabase\\.co/?", project_url):
+    if not re.fullmatch(r"https://[a-z0-9-]+\.supabase\.co/?", project_url):
         raise ValueError("Invalid Supabase URL")
     if not publishable_key.startswith("sb_publishable_"):
         raise ValueError("Expected publishable key (never service-role)")
