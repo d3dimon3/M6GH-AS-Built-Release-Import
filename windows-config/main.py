@@ -297,12 +297,12 @@ class WindowsConfig(tk.Tk):
 
     def open_abt(self):
         name = filedialog.askopenfilename(title="Открыть AS-Built",
-                                          filetypes=[("AS-Built", "*.abt *.txt *.asbuilt"), ("Все файлы", "*.*")])
+                                          filetypes=[("AS-Built и ключ администратора", "*.abt *.txt *.asbuilt *.key"), ("Все файлы", "*.*")])
         if not name:
             return
         try:
             raw = Path(name).read_bytes()
-            if Path(name).suffix.lower() == ".key":
+            if Path(name).suffix.lower() == ".key" or raw.lstrip(b"\xef\xbb\xbf").startswith(b"MAZDA6GH-ADMIN-V1"):
                 self.unlock_admin_key(raw)
                 return
             if len(raw) > 2_000_000:
