@@ -36,7 +36,7 @@ class HexTable(tk.Frame):
         self.items = []
         header = tk.Frame(self, bg="#dedee3")
         header.pack(fill="x")
-        for title, width in (("Адрес строки", 22), ("Значение HEX", 37)):
+        for title, width in (("Адрес строки", 16), ("Значение HEX", 30)):
             tk.Label(header, text=title, width=width, bg="#dedee3",
                      font=("Segoe UI", 10, "bold"), anchor="center").pack(
                          side="left", fill="x", expand=True, pady=3)
@@ -67,12 +67,12 @@ class HexTable(tk.Frame):
         row.pack(fill="x", pady=(0, 1))
         address_cell = tk.Frame(row, bg="#f0f0f2", bd=1, relief="solid")
         address_cell.pack(side="left", fill="both", expand=True, padx=(0, 1))
-        tk.Label(address_cell, text=address, width=22, bg="#f0f0f2",
+        tk.Label(address_cell, text=address, width=16, bg="#f0f0f2",
                  fg="#222222", font=("Consolas", 11, "bold"),
                  anchor="center", pady=1).pack(fill="x")
         value_cell = tk.Frame(row, bg="#f0f0f2", bd=1, relief="solid")
         value_cell.pack(side="left", fill="both", expand=True)
-        text = tk.Text(value_cell, height=1, width=37, bg="#f0f0f2",
+        text = tk.Text(value_cell, height=1, width=30, bg="#f0f0f2",
                        fg="#3b3b3b", font=("Consolas", 11), relief="flat",
                        bd=0, padx=5, pady=1, highlightthickness=0,
                        wrap="none", cursor="arrow")
@@ -113,9 +113,14 @@ class WindowsConfig(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("M6GH AS-Built Config — Windows")
-        self.geometry("900x820")
-        self.resizable(False, False)
-        self.after_idle(lambda: self.center_dialog(self, 900, 820, make_transient=False))
+        # Fit low-resolution Windows tablets while preserving desktop usability.
+        self.update_idletasks()
+        screen_w, screen_h = self.winfo_screenwidth(), self.winfo_screenheight()
+        width = min(850, max(480, screen_w - 36))
+        height = min(720, max(420, screen_h - 100))
+        self.geometry(f"{width}x{height}")
+        self.minsize(min(600, width), min(440, height))
+        self.after_idle(lambda: self.center_dialog(self, width, height, make_transient=False))
         self.configure(bg="#d7d7d7")
         self.active_module = "IC"
         self.raw_file: bytes | None = None
@@ -195,13 +200,13 @@ class WindowsConfig(tk.Tk):
                         highlightcolor="#b61d31", highlightthickness=2, **kwargs)
 
     def _build(self):
-        root = tk.Frame(self, bg="#d7d7d7", padx=18, pady=16)
+        root = tk.Frame(self, bg="#d7d7d7", padx=9, pady=7)
         root.pack(fill="both", expand=True)
 
         top = tk.Frame(root, bg="#d7d7d7", height=46)
         top.pack(fill="x", pady=(0, 5))
         heading = tk.Label(top, text="M6GH AS-BUILT CONFIG", bg="#d7d7d7",
-                           fg="#202020", font=("Segoe UI", 17, "bold"))
+                           fg="#202020", font=("Segoe UI", 14, "bold"))
         heading.pack(side="left", anchor="w", padx=(2, 0), pady=(4, 4))
         self.heading_label = heading
         helpbar = tk.Frame(top, bg="#d7d7d7")
@@ -216,20 +221,20 @@ class WindowsConfig(tk.Tk):
         tabbar = self.panel(root)
         tabbar.pack(fill="x", pady=(0, 6))
         for module in MODULES:
-            button = tk.Button(tabbar, text=module, font=("Segoe UI", 12, "bold"),
-                               relief="raised", bd=2, padx=14, pady=5,
+            button = tk.Button(tabbar, text=module, font=("Segoe UI", 10, "bold"),
+                               relief="raised", bd=1, padx=5, pady=2,
                                command=lambda m=module: self.select_module(m))
-            button.pack(side="left", fill="x", expand=True, padx=3, pady=3)
+            button.pack(side="left", fill="x", expand=True, padx=2, pady=2)
             self.tabs[module] = button
 
         info = self.panel(root)
         info.pack(fill="x", pady=(0, 6))
         self.module_label = tk.Label(info, bg="#f4f4f6", fg="#222222",
-                                     font=("Segoe UI", 15, "bold"), anchor="w")
-        self.module_label.pack(fill="x", padx=14, pady=(5, 1))
+                                     font=("Segoe UI", 12, "bold"), anchor="w")
+        self.module_label.pack(fill="x", padx=8, pady=(3, 0))
         self.module_details = tk.Label(info, bg="#f4f4f6", fg="#666666",
                                        font=("Segoe UI", 11), anchor="w")
-        self.module_details.pack(fill="x", padx=14, pady=(0, 5))
+        self.module_details.pack(fill="x", padx=8, pady=(0, 3))
 
         actions = tk.Frame(root, bg="#d7d7d7")
         actions.pack(side="bottom", fill="x", pady=(4, 0))
@@ -237,30 +242,30 @@ class WindowsConfig(tk.Tk):
         for label, command in ((self.admin_open_caption, self.open_abt),
                                (self.admin_save_caption, self.save_abt)):
             button = tk.Button(actions, text=label, command=command,
-                      font=("Segoe UI", 12, "bold"), padx=16, pady=7,
+                      font=("Segoe UI", 10, "bold"), padx=7, pady=3,
                       bg="#f4f4f6", activebackground="#e8e8ec")
             button.pack(side="left", fill="x", expand=True, padx=4)
             self.action_buttons.append(button)
-        self.status = tk.Label(root, wraplength=810, text="Перед изменением сохраняйте резервную копию исходного ABT",
+        self.status = tk.Label(root, wraplength=650, text="Перед изменением сохраняйте резервную копию исходного ABT",
                                bg="#f4f4f6", fg="#202020", font=("Segoe UI", 9),
-                               anchor="w", padx=8, pady=5,
+                               anchor="w", padx=5, pady=2,
                                highlightbackground="#b61d31", highlightthickness=2)
         self.status.pack(side="bottom", fill="x", pady=(0, 5))
         main = self.panel(root)
-        main.pack(fill="both", expand=True, pady=(0, 10))
-        tk.Label(main, text="ФУНКЦИИ БЛОКА", font=("Segoe UI", 13, "bold"),
-                 bg="#f4f4f6", anchor="w").pack(fill="x", padx=14, pady=(12, 3))
+        main.pack(fill="both", expand=True, pady=(0, 3))
+        tk.Label(main, text="ФУНКЦИИ БЛОКА", font=("Segoe UI", 11, "bold"),
+                 bg="#f4f4f6", anchor="w").pack(fill="x", padx=8, pady=(5, 1))
         self.features_hint = tk.Label(main, text="Загрузите локальный JSON с функциями для предварительной проверки",
                  font=("Segoe UI", 10), bg="#f4f4f6", fg="#555555",
                  anchor="w")
-        self.features_hint.pack(fill="x", padx=14, pady=(0, 4))
+        self.features_hint.pack(fill="x", padx=8, pady=(0, 2))
         self.feature_panel = tk.Frame(main, bg="#f4f4f6")
-        self.feature_panel.pack(fill="x", padx=14, pady=(0, 3))
-        tk.Label(main, text="AS-BUILT / HEX", font=("Segoe UI", 13, "bold"),
-                 bg="#f4f4f6", anchor="w").pack(fill="x", padx=14, pady=(0, 6))
+        self.feature_panel.pack(fill="x", padx=8, pady=(0, 2))
+        tk.Label(main, text="AS-BUILT / HEX", font=("Segoe UI", 11, "bold"),
+                 bg="#f4f4f6", anchor="w").pack(fill="x", padx=8, pady=(0, 3))
 
         grid = tk.Frame(main, bg="#f4f4f6")
-        grid.pack(fill="both", expand=True, padx=14, pady=(0, 12))
+        grid.pack(fill="both", expand=True, padx=8, pady=(0, 4))
         self.table = HexTable(grid)
         self.table.pack(fill="both", expand=True)
 
