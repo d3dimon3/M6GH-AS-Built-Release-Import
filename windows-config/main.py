@@ -417,10 +417,15 @@ class WindowsConfig(tk.Tk):
         editor.pack(fill="x", padx=8)
         fields = ("module", "label", "address", "mode", "indices", "on", "off", "byte_index")
         inputs = {}
+        captions = {"module": "Модуль", "label": "Надпись / функция",
+                    "address": "Строка AS-Built", "mode": "Режим HEX/BITS",
+                    "indices": "HEX индексы / биты", "on": "ВКЛ",
+                    "off": "ВЫКЛ", "byte_index": "Номер байта"}
         for i, field in enumerate(fields):
-            tk.Label(editor, text=field, bg="#f4f4f6").grid(row=(i // 4) * 2, column=i % 4)
-            entry = tk.Entry(editor, width=19)
-            entry.grid(row=(i // 4) * 2 + 1, column=i % 4, padx=4)
+            tk.Label(editor, text=captions[field], bg="#f4f4f6").grid(
+                row=(i // 2) * 2, column=i % 2, sticky="w", padx=12, pady=(5, 0))
+            entry = tk.Entry(editor, width=35)
+            entry.grid(row=(i // 2) * 2 + 1, column=i % 2, padx=12, pady=3)
             inputs[field] = entry
         selected = [None]
         def refresh_editor():
@@ -467,6 +472,8 @@ class WindowsConfig(tk.Tk):
                 if not positions or values["byte_index"] < 0:
                     raise ValueError("Неверные позиции")
                 if values["mode"] == "HEX":
+                    if not values["off"]:
+                        values["off"] = "0" * len(positions)
                     if len(positions) != len(norm(values["on"])) or len(positions) != len(norm(values["off"])):
                         raise ValueError("Количество HEX-позиций должно совпадать с ON и OFF")
                 elif values["mode"] != "BITS" or any(p > 7 for p in positions):
@@ -480,6 +487,7 @@ class WindowsConfig(tk.Tk):
                     self.features.append(candidate)
                 selected[0] = candidate.id
                 refresh_editor()
+                messagebox.showinfo("Функция сохранена", "Функция добавлена или изменена в локальном каталоге.", parent=dialog)
                 self.status.configure(text="Админка: изменения применены локально, сервер не затронут.")
             except (ValueError, TypeError) as exc:
                 messagebox.showerror("Редактор", str(exc), parent=dialog)
@@ -498,7 +506,7 @@ class WindowsConfig(tk.Tk):
                 refresh_editor()
         controls = tk.Frame(features_page, bg="#f4f4f6")
         controls.pack()
-        for label, callback in (("Новая", new_local), ("Сохранить", save_local), ("Удалить", delete_local)):
+        for label, callback in (("Добавить новую", new_local), ("Добавить / изменить", save_local), ("Удалить", delete_local)):
             tk.Button(controls, text=label, command=callback).pack(side="left", padx=4)
         refresh_editor()
         def export_catalog():
