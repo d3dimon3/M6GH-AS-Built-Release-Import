@@ -1,0 +1,24 @@
+# M6GH AS-Built Config — Windows 10/11 (independent prototype)
+
+This directory is an **independent Windows application**, developed in branch `windows-config-v1`.
+It does not change the Android Config, Android Admin, or Android Config AS-Built APKs.
+
+## Stage 1 — Windows UI + local ABT viewer
+
+Run `python main.py` with Python 3.10+ on Windows 10/11. The app uses only Python's standard library (Tkinter).
+The window is wide, with a gray background, red borders, module tabs and local ABT rows. There is no Mazda banner.
+`Open ABT` parses address/value rows; `Save ABT` saves the loaded file's original text, without rewriting checksums or configuration.
+
+**Important:** This is a viewer/prototype, not yet a replacement for Android Config.
+Checkboxes are not shown until the Android configuration engine has been ported and tested.
+Online Supabase signed catalog verification, license activation, embedded admin and ABT editing are **not implemented yet**. Never trust or publish unsigned remote settings.
+
+## Planned next steps
+
+1. Port and test ABT parsing and the module-specific feature/HEX/BITS rules against Android fixtures.
+2. Port signed Supabase publication verification, using the existing trusted public key.
+3. Add the Windows Device ID + RSA-signed activation flow. Windows IDs differ from Android IDs; the existing Android key generator needs a compatible Windows issuance path.
+4. Port the embedded admin controls without embedding service-role keys or bypassing server publication authorization.
+5. Package as a standalone Windows 10/11 executable and test on a real Windows PC.
+
+The Windows application will read the same **published** configuration as Android, but must keep separate local storage and licensing. No Supabase database schema changes are planned.
