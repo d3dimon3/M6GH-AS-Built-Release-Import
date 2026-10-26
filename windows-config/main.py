@@ -1232,8 +1232,11 @@ class WindowsConfig(tk.Tk):
         text.insert("end", self.admin_warning_title + "\n" + self.admin_warning_text + "\n\n\n\n\n", "warning")
         for number, (role, name, link) in enumerate(self.admin_authors):
             text.insert("end", role + ": ")
-            text.tag_configure("drive2_icon", foreground="#c81930", font=("Segoe UI", 11, "bold"))
-            text.insert("end", "▣D  ", ("drive2_icon",))
+            icon = tk.Canvas(text, width=18, height=18, bg="#f4f4f6", highlightthickness=0, bd=0)
+            icon.create_rectangle(0, 0, 18, 18, fill="#d50032", outline="#d50032")
+            icon.create_text(9, 9, text="D", fill="white", font=("Arial", 12, "bold"))
+            text.window_create("end", window=icon, padx=3, pady=0)
+            text.insert("end", " ")
             if link and link.startswith(("https://", "http://")):
                 tag = "author_link_" + str(number)
                 text.tag_configure(tag, foreground="#1264a3", underline=True)
