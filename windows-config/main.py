@@ -544,11 +544,11 @@ class WindowsConfig(tk.Tk):
         for button, caption in zip(self.action_buttons, (self.admin_open_caption, self.admin_save_caption)):
             button.configure(text=caption)
         self.heading_label.configure(text=heading)
+        for index, module in enumerate(m for m in MODULES if m in visible):
+            self.tabs[module].place(x=3, y=5 + index * 42, width=57, height=35)
         for module, button in self.tabs.items():
-            if module in visible:
-                button.pack(side="left", fill="x", expand=True, padx=3, pady=3)
-            else:
-                button.pack_forget()
+            if module not in visible:
+                button.place_forget()
         self.select_module(self.active_module if self.active_module in visible else next(m for m in MODULES if m in visible))
 
     def show_admin_panel(self):
@@ -830,11 +830,11 @@ class WindowsConfig(tk.Tk):
                 new_info[module] = {"name": name, "version": version}
             self.admin_module_info = new_info
             self.admin_visible_modules = enabled
+            for index, module in enumerate(m for m in MODULES if m in enabled):
+                self.tabs[module].place(x=3, y=5 + index * 42, width=57, height=35)
             for module, button in self.tabs.items():
-                if module in enabled:
-                    button.pack(side="left", fill="x", expand=True, padx=3, pady=3)
-                else:
-                    button.pack_forget()
+                if module not in enabled:
+                    button.place_forget()
             self.select_module(self.active_module if self.active_module in enabled else next(m for m in MODULES if m in enabled))
             self.save_admin_draft_file()
             self.status.configure(text="Карточки блоков сохранены локально.")
