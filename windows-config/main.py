@@ -28,6 +28,86 @@ ROW_PATTERN = re.compile(r"(?<![A-Za-z0-9])([0-9A-Fa-f]{3}-[0-9A-Fa-f]{2}-[0-9A-
 
 
 
+
+def normalize_admin_settings(data):
+    """Accept Windows drafts and legacy Android Admin schema-2 exports."""
+    if not isinstance(data, dict):
+        raise ValueError("Неверный формат настроек")
+    if data.get("format") == "m6gh-windows-admin-draft-v1":
+        return data
+    if data.get("kind") != "mazda6gh-admin-settings" or data.get("schema") != 2:
+        raise ValueError("Неверный формат настроек")
+    stores = data.get("stores")
+    if not isinstance(stores, dict):
+        raise ValueError("В файле отсутствует каталог настроек")
+    settings = stores.get("run35_settings", {})
+    if not isinstance(settings, dict):
+        raise ValueError("Повреждён раздел настроек")
+    def unpack(value, fallback):
+        if value is None:
+            return fallback
+        result = json.loads(value) if isinstance(value, str) else value
+        return result
+    source_features = unpack(settings.get("features"), [])
+    if not isinstance(source_features, list):
+        raise ValueError("Неверный список функций")
+    features = []
+    for item in source_features:
+        if not isinstance(item, dict):
+            raise ValueError("Повреждена запись функции")
+        module = str(item.get("module", "")).upper()
+        address = str(item.get("row", item.get("address", ""))).upper()
+        if module not in MODULES or not address.startswith(MODULES[module] + "-"):
+            raise ValueError("Неизвестный блок или адрес функции: " + module + " " + address)
+        features.append(dict(id=str(item.get("id", "")), module=module, address=address,
+                             mode=str(item.get("mode", "HEX")).upper(),
+                             indices=str(item.get("indices", "")), on=str(item.get("on", "")),
+                             off=str(item.get("off", "")), byte_index=int(item.get("byte", item.get("byte_index", 0))),
+                             label=str(item.get("label", item.get("id", "")))))
+    extra_rows = set()
+    for store_name in ("studio_admin_rows", "studio_admin_custom_rows"):
+        rows_by_module = stores.get(store_name, {})
+        if not isinstance(rows_by_module, dict):
+            raise ValueError("Повреждён каталог адресов")
+        for module, raw in rows_by_module.items():
+            if module not in MODULES:
+                continue
+            rows = unpack(raw, [])
+            if not isinstance(rows, list):
+                raise ValueError("Неверный список адресов")
+            for item in rows:
+                if not isinstance(item, dict):
+                    continue
+                address = str(item.get("address", "")).upper()
+                if re.fullmatch(r"[0-9A-F]{3}-[0-9]{2}-[0-9]{2}", address) and address.startswith(MODULES[module] + "-"):
+                    extra_rows.add((module, address))
+    custom_modules = unpack(stores.get("studio_custom_modules", {}).get("catalog"), [])
+    module_info = {}
+    if isinstance(custom_modules, list):
+        for item in custom_modules:
+            if isinstance(item, dict) and item.get("id") in MODULES:
+                module_info[item["id"]] = {"name": str(item.get("name", item["id"])), "version": str(item.get("version", ""))}
+    faq = unpack(stores.get("studio_faq", {}).get("entries"), [])
+    if not isinstance(faq, list):
+        raise ValueError("Неверный формат FAQ")
+    return {
+        "format": "m6gh-windows-admin-draft-v1", "features": features,
+        "extra_rows": [list(x) for x in sorted(extra_rows)],
+        "visible_modules": list(MODULES), "module_info": module_info,
+        "heading": str(settings.get("appearance_title") or "M6GH AS-BUILT CONFIG").strip()[:45],
+        "open_caption": str(settings.get("appearance_open_text") or "Открыть ABT"),
+        "save_caption": str(settings.get("appearance_save_text") or "Сохранить ABT"),
+        "about_description": str(settings.get("appearance_about_description") or ""),
+        "warning_title": str(settings.get("appearance_warning_title") or "WARNING"),
+        "warning_text": str(settings.get("appearance_warning_body") or ""),
+        "authors": [
+            [str(settings.get("appearance_creator1_role") or ""), str(settings.get("appearance_creator1_name") or ""), str(settings.get("appearance_creator1_url") or "")],
+            [str(settings.get("appearance_creator2_role") or ""), str(settings.get("appearance_creator2_name") or ""), str(settings.get("appearance_creator2_url") or "")],
+        ],
+        "faq": faq,
+    }
+
+
 class HexTable(tk.Frame):
     """Compact bordered HEX rows with character-level active-feature highlighting."""
     def __init__(self, parent):
@@ -865,6 +945,11 @@ class WindowsConfig(tk.Tk):
                 "open_caption": self.admin_open_caption,
                 "save_caption": self.admin_save_caption,
                 "faq": self.faq_entries,
+                "module_info": self.admin_module_info,
+                "about_description": self.admin_about_description,
+                "warning_title": self.admin_warning_title,
+                "warning_text": self.admin_warning_text,
+                "authors": self.admin_authors,
             }
             try:
                 Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -879,9 +964,7 @@ class WindowsConfig(tk.Tk):
             if not path:
                 return
             try:
-                data = json.loads(Path(path).read_text(encoding="utf-8"))
-                if data.get("format") != "m6gh-windows-admin-draft-v1":
-                    raise ValueError("Неверный формат настроек")
+                data = normalize_admin_settings(json.loads(Path(path).read_text(encoding="utf-8-sig")))
                 features = [Feature(**item) for item in data["features"]]
                 extra_rows = {(module, address) for module, address in data["extra_rows"]
                               if module in MODULES and re.fullmatch(r"[0-9A-F]{3}-[0-9]{2}-[0-9]{2}", address)
@@ -899,6 +982,20 @@ class WindowsConfig(tk.Tk):
             self.admin_visible_modules = visible
             self.admin_heading = heading
             self.faq_entries = faq
+            self.admin_open_caption = str(data.get("open_caption", self.admin_open_caption))
+            self.admin_save_caption = str(data.get("save_caption", self.admin_save_caption))
+            self.admin_about_description = str(data.get("about_description", self.admin_about_description))
+            self.admin_warning_title = str(data.get("warning_title", self.admin_warning_title))
+            self.admin_warning_text = str(data.get("warning_text", self.admin_warning_text))
+            authors = data.get("authors")
+            if isinstance(authors, list) and len(authors) == 2 and all(isinstance(x, list) and len(x) == 3 for x in authors):
+                self.admin_authors = authors
+            for module, info in data.get("module_info", {}).items():
+                if module in MODULES and isinstance(info, dict):
+                    self.admin_module_info[module] = {"name": str(info.get("name", module)), "version": str(info.get("version", ""))}
+            for button, caption in zip(self.action_buttons, (self.admin_open_caption, self.admin_save_caption)):
+                button.configure(text=caption)
+            self.save_admin_draft_file()
             self.heading_label.configure(text=heading)
             self.select_module(self.active_module if self.active_module in visible else next(iter(sorted(visible))))
             refresh_rows()
@@ -921,6 +1018,11 @@ class WindowsConfig(tk.Tk):
                     "open_caption": self.admin_open_caption,
                     "save_caption": self.admin_save_caption,
                     "faq": self.faq_entries,
+                    "module_info": self.admin_module_info,
+                    "about_description": self.admin_about_description,
+                    "warning_title": self.admin_warning_title,
+                    "warning_text": self.admin_warning_text,
+                    "authors": self.admin_authors,
                 }
                 temporary = destination.with_suffix(".tmp")
                 temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
