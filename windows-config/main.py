@@ -6,13 +6,13 @@ from __future__ import annotations
 
 import re
 import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog, ttk
+from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
 import json
 import os
 import threading
 from snapshot_mapper import parse_snapshot
-from connection_settings import load_key, save_key
+from public_connection import PUBLISHABLE_KEY
 from abt_codec import parse_checked
 from license_gate import device_id, saved_license_valid, store_license
 from supabase_publication import download_verified_row
@@ -146,8 +146,6 @@ class WindowsConfig(tk.Tk):
         actions = tk.Frame(root, bg="#d7d7d7")
         actions.pack(fill="x", pady=(0, 10))
         for label, command in (("Открыть ABT", self.open_abt),
-                               ("Загрузить функции JSON", self.open_features),
-                               ("Обновить с сервера", self.refresh_online),
                                ("Сохранить копию ABT", self.save_abt)):
             tk.Button(actions, text=label, command=command,
                       font=("Segoe UI", 12, "bold"), padx=16, pady=12,
@@ -224,32 +222,21 @@ class WindowsConfig(tk.Tk):
             self.status.configure(text="Офлайн-кэш отклонён: " + str(exc)[:120])
 
     def refresh_online_silent(self):
-        if load_key() or os.environ.get('M6GH_SUPABASE_PUBLISHABLE_KEY'):
-            self.refresh_online(silent=True)
-
-    def refresh_online(self, silent=False):
-        # The publishable key is supplied at runtime, never committed to GitHub.
-        url = os.environ.get("M6GH_SUPABASE_URL", "https://zyksvoauffhexketcyrq.supabase.co")
-        key = load_key() or os.environ.get("M6GH_SUPABASE_PUBLISHABLE_KEY", "")
+        # Automatic only; no credentials or network prompts in customer UI.
+        key = PUBLISHABLE_KEY or os.environ.get("M6GH_SUPABASE_PUBLISHABLE_KEY", "")
         if not key:
-            key = simpledialog.askstring("Подключение Supabase", "Введите публичный ключ Supabase (sb_publishable_...). Он сохранится на этом компьютере.", parent=self)
-            if not key:
-                return
-            try:
-                save_key(key)
-            except ValueError as exc:
-                messagebox.showerror("Supabase", str(exc))
+            self.status.configure(text="Онлайн-каталог не настроен в сборке; используется офлайн-кэш.")
             return
-        self.status.configure(text="Проверка подписи и загрузка настроек...")
+        url = "https://zyksvoauffhexketcyrq.supabase.co"
+        self.status.configure(text="Автоматическая проверка обновлений...")
         def worker():
             try:
-                publication = save_verified_cache(download_verified_row(url, key))
+                row = download_verified_row(url, key)
+                publication = save_verified_cache(row)
                 features = parse_snapshot(publication.snapshot)
-            except Exception as exc:
-                error = str(exc)
-                if not silent:
-                    self.after(0, lambda: messagebox.showerror("Supabase", error))
-                self.after(0, lambda: self.status.configure(text="Обновление отклонено. Настройки не изменены."))
+            except Exception:
+                self.after(0, lambda: self.status.configure(
+                    text="Сервер недоступен или публикация отклонена. Используются сохранённые настройки."))
                 return
             def apply():
                 self.features = features
@@ -260,7 +247,7 @@ class WindowsConfig(tk.Tk):
                     if original is not None:
                         self.engine.seed(feature, self.engine.state(feature, original))
                 self.select_module(self.active_module)
-                self.status.configure(text=f"Проверена подпись. Версия {publication.version}, функций: {len(features)}.")
+                self.status.configure(text=f"Настройки обновлены автоматически: версия {publication.version}, функций {len(features)}.")
             self.after(0, apply)
         threading.Thread(target=worker, daemon=True).start()
 
