@@ -12,12 +12,17 @@ permissions:
 
 jobs:
   windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [x64, x86]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          architecture: ${{ matrix.architecture }}
       - name: Install dependencies
         run: python -m pip install -r windows-config/requirements.txt
       - name: Run unit tests
@@ -38,6 +43,6 @@ jobs:
         run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name M6GH-AS-Built-Config main.py
       - uses: actions/upload-artifact@v4
         with:
-          name: M6GH-AS-Built-Config-Windows-x64
+          name: M6GH-AS-Built-Config-Windows-${{ matrix.architecture }}
           path: windows-config/dist/M6GH-AS-Built-Config.exe
           if-no-files-found: error
