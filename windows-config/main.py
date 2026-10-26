@@ -11,6 +11,8 @@ from pathlib import Path
 import json
 import os
 import threading
+import logging
+import urllib.error
 from snapshot_mapper import parse_snapshot
 from public_connection import PUBLISHABLE_KEY
 from abt_codec import parse_checked
@@ -234,9 +236,18 @@ class WindowsConfig(tk.Tk):
                 row = download_verified_row(url, key)
                 publication = save_verified_cache(row)
                 features = parse_snapshot(publication.snapshot)
-            except Exception:
-                self.after(0, lambda: self.status.configure(
-                    text="Сервер недоступен или публикация отклонена. Используются сохранённые настройки."))
+            except Exception as exc:
+                # Never expose credentials, payloads or server response bodies.
+                if isinstance(exc, urllib.error.HTTPError):
+                    detail = f"HTTP {exc.code}"
+                elif isinstance(exc, urllib.error.URLError):
+                    detail = "Нет соединения с сервером"
+                elif isinstance(exc, (ValueError, KeyError, TypeError)):
+                    detail = "Ошибка проверки публикации: " + str(exc)[:120]
+                else:
+                    detail = type(exc).__name__
+                self.after(0, lambda d=detail: self.status.configure(
+                    text="Автообновление не удалось: " + d + ". Настройки не изменены."))
                 return
             def apply():
                 self.features = features
