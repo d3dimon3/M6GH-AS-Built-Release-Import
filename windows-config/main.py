@@ -17,7 +17,7 @@ from supabase_publication import download_verified_row
 from publication_cache import load_verified_cache, save_verified_cache
 from feature_engine import Feature, FeatureEngine, checksum_valid
 
-MODULES = {"IC": "720", "BCM": "726", "RKE": "731", "ABS": "760", "AFS": None}
+MODULES = {"IC": "720", "BCM": "726", "RKE": "731", "ABS": "760", "AFS": "737"}
 ROW_PATTERN = re.compile(r"(?<![A-Za-z0-9])([0-9A-Fa-f]{3}-[0-9A-Fa-f]{2}-[0-9A-Fa-f]{2})\s+((?:[0-9A-Fa-f]{2,4}[ \t]+)*[0-9A-Fa-f]{2,4})(?![A-Za-z0-9])")
 
 
