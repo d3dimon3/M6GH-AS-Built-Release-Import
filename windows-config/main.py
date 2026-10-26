@@ -5,6 +5,8 @@ Python 3.10+, standard library only. No vehicle writes or network publishing.
 from __future__ import annotations
 
 import re
+import webbrowser
+from html.parser import HTMLParser
 import hashlib
 import hmac
 import tkinter as tk
@@ -637,9 +639,11 @@ class WindowsConfig(tk.Tk):
                     if not values["off"]:
                         values["off"] = "0" * len(positions)
                     if len(positions) != len(norm(values["on"])) or len(positions) != len(norm(values["off"])):
-                        raise ValueError("Количество HEX-позиций должно совпадать с ON и OFF")
+                        raise ValueError("Число HEX-позиций должно совпадать с длиной ВКЛ и ВЫКЛ. Для одного символа: индекс 0, ВКЛ=1, ВЫКЛ=2.")
                 elif values["mode"] != "BITS" or any(p > 7 for p in positions):
                     raise ValueError("Неверные позиции BITS")
+                if not values["label"] or not values["on"]:
+                    raise ValueError("Заполните название функции и значение ВКЛ.")
                 previous = next((f for f in self.features if f.id == selected[0]), None)
                 candidate = replace(previous, **values) if previous else Feature(
                     id="local-" + uuid.uuid4().hex[:12], **values)
@@ -1179,12 +1183,50 @@ class WindowsConfig(tk.Tk):
         bar.pack(side="right", fill="y")
         text.configure(yscrollcommand=bar.set)
         text.tag_configure("warning", foreground="#b61d31", font=("Segoe UI", 11, "bold"), justify="center")
-        text.insert("end", self.admin_about_description + "\n\n")
+        for name, options in {
+            "bold": {"font": ("Segoe UI", 11, "bold")},
+            "italic": {"font": ("Segoe UI", 11, "italic")},
+            "underline": {"underline": True},
+            "strike": {"overstrike": True},
+        }.items():
+            text.tag_configure(name, **options)
+
+        class Markup(HTMLParser):
+            tags = {"b": "bold", "strong": "bold", "u": "underline",
+                    "s": "strike", "strike": "strike", "del": "strike",
+                    "i": "italic", "em": "italic"}
+            def __init__(self):
+                super().__init__(convert_charrefs=True)
+                self.active = []
+            def handle_starttag(self, tag, attrs):
+                if tag in self.tags:
+                    self.active.append(self.tags[tag])
+                elif tag == "br":
+                    text.insert("end", "\n")
+            def handle_endtag(self, tag):
+                value = self.tags.get(tag)
+                if value in self.active:
+                    self.active.remove(value)
+            def handle_data(self, data):
+                text.insert("end", data, tuple(self.active))
+
+        markup = Markup()
+        markup.feed(self.admin_about_description)
+        markup.close()
+        text.insert("end", "\n\n")
         text.insert("end", self.admin_warning_title + "\n" + self.admin_warning_text + "\n\n", "warning")
-        for role, name, link in self.admin_authors:
-            text.insert("end", role + ": " + name + "\n")
-            if link:
-                text.insert("end", link + "\n")
+        for number, (role, name, link) in enumerate(self.admin_authors):
+            text.insert("end", role + ": ")
+            if link and link.startswith(("https://", "http://")):
+                tag = "author_link_" + str(number)
+                text.tag_configure(tag, foreground="#1264a3", underline=True)
+                text.tag_bind(tag, "<Button-1>", lambda event, url=link: webbrowser.open(url))
+                text.tag_bind(tag, "<Enter>", lambda event: text.configure(cursor="hand2"))
+                text.tag_bind(tag, "<Leave>", lambda event: text.configure(cursor="arrow"))
+                text.insert("end", name, (tag,))
+            else:
+                text.insert("end", name)
+            text.insert("end", "\n")
         text.configure(state="disabled")
         tk.Button(dialog, text="Закрыть", command=dialog.destroy, bg="#c81930", fg="white",
                   font=("Segoe UI", 12, "bold"), pady=10).pack(fill="x", padx=36, pady=16)
