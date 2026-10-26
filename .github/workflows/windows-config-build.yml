@@ -22,6 +22,17 @@ jobs:
         run: python -m pip install -r windows-config/requirements.txt
       - name: Run unit tests
         run: python -m unittest discover -s windows-config -p "test_*.py" -v
+      - name: Embed public Supabase connection
+        shell: pwsh
+        env:
+          SUPABASE_PUBLIC_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          $key = $env:SUPABASE_PUBLIC_KEY
+          if (-not $key.StartsWith('sb_publishable_')) {
+            Write-Host "::warning::SUPABASE_PUBLISHABLE_KEY repository variable not configured; online sync disabled."
+          }
+          $json = ConvertTo-Json -InputObject $key -Compress
+          Set-Content -Path windows-config/public_connection.py -Value ("PUBLISHABLE_KEY = " + $json) -Encoding utf8
       - name: Package executable
         working-directory: windows-config
         run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name M6GH-AS-Built-Config main.py
