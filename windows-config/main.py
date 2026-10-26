@@ -602,6 +602,12 @@ class WindowsConfig(tk.Tk):
                 if original is not None:
                     self.engine.seed(f, self.engine.state(f, original))
             self.select_module(self.active_module)
+            if selected[0]:
+                for item in tree.get_children():
+                    if selected[0] in tree.item(item, "tags"):
+                        tree.selection_set(item)
+                        tree.see(item)
+                        break
         def pick(event=None):
             selection = tree.selection()
             if not selection:
@@ -652,9 +658,14 @@ class WindowsConfig(tk.Tk):
                 else:
                     self.features.append(candidate)
                 selected[0] = candidate.id
-                refresh_editor()
                 self.save_admin_draft_file()
-                messagebox.showinfo("Функции и биты", "Функция сохранена: " + candidate.label, parent=dialog)
+                refresh_editor()
+                if not any(f.id == candidate.id for f in self.features):
+                    raise RuntimeError("Функция не появилась в каталоге после сохранения")
+                messagebox.showinfo("Функции и биты", "Функция сохранена: " + candidate.label +
+                    "\\nБлок: " + candidate.module +
+                    "\\nАдрес: " + candidate.address +
+                    "\\nВсего функций: " + str(len(self.features)), parent=dialog)
                 self.status.configure(text="Админка: изменения применены локально, сервер не затронут.")
             except Exception as exc:
                 messagebox.showerror("Редактор", "Не удалось сохранить функцию: " + str(exc), parent=dialog)
