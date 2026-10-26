@@ -135,6 +135,10 @@ class WindowsConfig(tk.Tk):
         self.admin_heading = "M6GH AS-BUILT CONFIG"
         self.admin_open_caption = "Открыть ABT"
         self.admin_save_caption = "Сохранить ABT"
+        self.admin_about_description = "M6GH AS-Built Config — для редактирования заводских конфигураций электронных блоков Mazda 6 GH. Приложение предназначено для активации и деактивации функций оборудования. После изменения функций сохраните новый ABT и проверьте его перед программированием в FORScan."
+        self.admin_warning_title = "⚠ WARNING ⚠"
+        self.admin_warning_text = "НЕ ЗАБЫВАЙТЕ ДЕЛАТЬ КОПИЮ ИСХОДНОГО ФАЙЛА НАСТРОЕК ИЗ FORSCAN."
+        self.admin_authors = [["Разработчик", "Dim304", "https://www.drive2.ru/users/dim304/"], ["Соавтор", "Wolis11", "https://www.drive2.ru/users/wolis11/"]]
         self.catalog_version = None
         self.withdraw()
         self.after(100, self.enforce_license)
@@ -374,6 +378,10 @@ class WindowsConfig(tk.Tk):
             "faq": self.faq_entries,
             "open_caption": self.admin_open_caption,
             "save_caption": self.admin_save_caption,
+            "about_description": self.admin_about_description,
+            "warning_title": self.admin_warning_title,
+            "warning_text": self.admin_warning_text,
+            "authors": self.admin_authors,
         }
         temporary = destination.with_suffix(".tmp")
         temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -409,6 +417,12 @@ class WindowsConfig(tk.Tk):
         for button, caption in zip(self.action_buttons, (self.admin_open_caption, self.admin_save_caption)):
             button.configure(text=caption)
         self.faq_entries = faq
+        self.admin_about_description = str(data.get("about_description", self.admin_about_description))
+        self.admin_warning_title = str(data.get("warning_title", self.admin_warning_title))
+        self.admin_warning_text = str(data.get("warning_text", self.admin_warning_text))
+        authors = data.get("authors", self.admin_authors)
+        if isinstance(authors, list) and len(authors) == 2 and all(isinstance(x, list) and len(x) == 3 for x in authors):
+            self.admin_authors = authors
         self.admin_open_caption = str(data.get("open_caption", self.admin_open_caption))
         self.admin_save_caption = str(data.get("save_caption", self.admin_save_caption))
         for button, caption in zip(self.action_buttons, (self.admin_open_caption, self.admin_save_caption)):
@@ -670,7 +684,46 @@ class WindowsConfig(tk.Tk):
                 button.configure(text=caption)
             self.save_admin_draft_file()
             messagebox.showinfo("Оформление", "Надписи сохранены локально.", parent=dialog)
-        tk.Button(appearance, text="Сохранить оформление", command=apply_appearance).pack(pady=15)
+        tk.Button(appearance, text="Сохранить оформление", command=apply_appearance).pack(pady=8)
+        about_editor = tk.Frame(appearance, bg="#f4f4f6")
+        about_editor.pack(fill="both", expand=True, padx=22, pady=8)
+        about_canvas = tk.Canvas(about_editor, bg="#f4f4f6", highlightthickness=0)
+        about_scroll = ttk.Scrollbar(about_editor, orient="vertical", command=about_canvas.yview)
+        about_canvas.configure(yscrollcommand=about_scroll.set)
+        about_scroll.pack(side="right", fill="y")
+        about_canvas.pack(side="left", fill="both", expand=True)
+        about_content = tk.Frame(about_canvas, bg="#f4f4f6")
+        about_window = about_canvas.create_window((0, 0), window=about_content, anchor="nw")
+        about_content.bind("<Configure>", lambda e: about_canvas.configure(scrollregion=about_canvas.bbox("all")))
+        about_canvas.bind("<Configure>", lambda e: about_canvas.itemconfigure(about_window, width=e.width))
+        def labeled_text(label, initial, height):
+            tk.Label(about_content, text=label, bg="#f4f4f6", anchor="w").pack(fill="x", pady=(8, 2))
+            widget = tk.Text(about_content, height=height, wrap="word", font=("Segoe UI", 10))
+            widget.insert("1.0", initial)
+            widget.pack(fill="x")
+            return widget
+        description_editor = labeled_text("Описание программы", self.admin_about_description, 5)
+        warning_title_editor = labeled_text("Заголовок предупреждения (красный)", self.admin_warning_title, 1)
+        warning_text_editor = labeled_text("Текст предупреждения (красный)", self.admin_warning_text, 3)
+        author_inputs = []
+        for number, author in enumerate(self.admin_authors, 1):
+            group = []
+            for caption, value in zip(("Подпись", "Имя", "Ссылка Drive2"), author):
+                tk.Label(about_content, text=f"Автор {number} — {caption}", bg="#f4f4f6").pack(anchor="w", pady=(5, 1))
+                field = tk.Entry(about_content)
+                field.insert(0, value)
+                field.pack(fill="x")
+                group.append(field)
+            author_inputs.append(group)
+        def save_about():
+            self.admin_about_description = description_editor.get("1.0", "end-1c").strip()
+            self.admin_warning_title = warning_title_editor.get("1.0", "end-1c").strip()
+            self.admin_warning_text = warning_text_editor.get("1.0", "end-1c").strip()
+            self.admin_authors = [[entry.get().strip() for entry in group] for group in author_inputs]
+            self.save_admin_draft_file()
+            messagebox.showinfo("Оформление", "Описание, предупреждение и авторы сохранены.", parent=dialog)
+        tk.Button(about_content, text="Сохранить описание и авторов", command=save_about).pack(pady=12)
+
         faq_page = pages["FAQ"]
         tk.Label(faq_page, text="Редактор FAQ (локально)", font=("Segoe UI", 14, "bold"),
                  bg="#f4f4f6").pack(pady=8)
@@ -943,12 +996,12 @@ class WindowsConfig(tk.Tk):
         bar.pack(side="right", fill="y")
         text.configure(yscrollcommand=bar.set)
         text.tag_configure("warning", foreground="#b61d31", font=("Segoe UI", 11, "bold"), justify="center")
-        text.insert("end", "M6GH AS-Built Config — для редактирования заводских конфигураций электронных блоков Mazda 6 GH.\n\n")
-        text.insert("end", "Приложение предназначено для активации и деактивации функций оборудования.\n\n")
-        text.insert("end", "Инструкция:\nСохраните исходную конфигурацию блока в FORScan в формате AS-Built. Выберите соответствующий блок и откройте ABT. После загрузки доступны функции предварительного изменения HEX.\n\n")
-        text.insert("end", "После изменения функций сохраните новый ABT и проверьте его перед программированием в FORScan.\n\n")
-        text.insert("end", "⚠ WARNING ⚠\nНЕ ЗАБЫВАЙТЕ ДЕЛАТЬ КОПИЮ ИСХОДНОГО ФАЙЛА НАСТРОЕК ИЗ FORSCAN.\n\n", "warning")
-        text.insert("end", "Разработчик: Dim304\nСоавтор: Wolis11\n")
+        text.insert("end", self.admin_about_description + "\n\n")
+        text.insert("end", self.admin_warning_title + "\n" + self.admin_warning_text + "\n\n", "warning")
+        for role, name, link in self.admin_authors:
+            text.insert("end", role + ": " + name + "\n")
+            if link:
+                text.insert("end", link + "\n")
         text.configure(state="disabled")
         tk.Button(dialog, text="Закрыть", command=dialog.destroy, bg="#c81930", fg="white",
                   font=("Segoe UI", 12, "bold"), pady=10).pack(fill="x", padx=36, pady=16)
