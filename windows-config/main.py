@@ -9,6 +9,10 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
 import json
+import os
+import threading
+from snapshot_mapper import parse_snapshot
+from supabase_publication import download_verified
 from feature_engine import Feature, FeatureEngine, checksum_valid
 
 MODULES = {"IC": "720", "BCM": "726", "RKE": None, "ABS": None, "AFS": None}
@@ -93,6 +97,7 @@ class WindowsConfig(tk.Tk):
         actions.pack(fill="x", pady=(0, 10))
         for label, command in (("Открыть ABT", self.open_abt),
                                ("Загрузить функции JSON", self.open_features),
+                               ("Обновить с сервера", self.refresh_online),
                                ("Сохранить копию ABT", self.save_abt)):
             tk.Button(actions, text=label, command=command,
                       font=("Segoe UI", 12, "bold"), padx=16, pady=12,
@@ -150,6 +155,36 @@ class WindowsConfig(tk.Tk):
             self.status.configure(text=f"Загружен {self.source_path.name}: {len(matches)} строк. Только просмотр.")
         except (OSError, UnicodeError, ValueError) as exc:
             messagebox.showerror("Ошибка открытия ABT", str(exc))
+
+    def refresh_online(self):
+        # The publishable key is supplied at runtime, never committed to GitHub.
+        url = os.environ.get("M6GH_SUPABASE_URL", "https://zyksvoauffhexketcyrq.supabase.co")
+        key = os.environ.get("M6GH_SUPABASE_PUBLISHABLE_KEY", "")
+        if not key:
+            messagebox.showinfo("Supabase", "Для первого теста задайте M6GH_SUPABASE_PUBLISHABLE_KEY в Windows.")
+            return
+        self.status.configure(text="Проверка подписи и загрузка настроек...")
+        def worker():
+            try:
+                publication = download_verified(url, key)
+                features = parse_snapshot(publication.snapshot)
+            except Exception as exc:
+                error = str(exc)
+                self.after(0, lambda: messagebox.showerror("Supabase", error))
+                self.after(0, lambda: self.status.configure(text="Обновление отклонено. Настройки не изменены."))
+                return
+            def apply():
+                self.features = features
+                self.preview_rows.clear()
+                self.engine = FeatureEngine()
+                for feature in features:
+                    original = next((v for a, v in self.rows if a == feature.address), None)
+                    if original is not None:
+                        self.engine.seed(feature, self.engine.state(feature, original))
+                self.select_module(self.active_module)
+                self.status.configure(text=f"Проверена подпись. Версия {publication.version}, функций: {len(features)}.")
+            self.after(0, apply)
+        threading.Thread(target=worker, daemon=True).start()
 
     def open_features(self):
         name = filedialog.askopenfilename(title="Локальные функции (без Supabase)",
