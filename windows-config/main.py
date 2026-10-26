@@ -309,7 +309,7 @@ class WindowsConfig(tk.Tk):
         # Compatibility with the owner's historical admin key. This is an
         # exact-file compatibility check, not a cryptographic signature scheme.
         expected = "73c58455bbe288de332228b8169a630d6254a9c129930c73268b9e42d6d313ea"
-        valid = raw.strip().startswith(b"MAZDA6GH-ADMIN-V1\\n") and hmac.compare_digest(
+        valid = raw.strip().startswith(b"MAZDA6GH-ADMIN-V1\n") and hmac.compare_digest(
             hashlib.sha256(raw.strip()).hexdigest(), expected)
         if not valid:
             messagebox.showerror("Админ-ключ", "Ключ администратора не распознан.")
