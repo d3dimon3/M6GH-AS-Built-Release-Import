@@ -571,11 +571,64 @@ class WindowsConfig(tk.Tk):
         tk.Button(appearance, text="Применить заголовок", command=apply_title).pack(pady=10)
         tk.Label(appearance, text="Изменение локальное, до выхода из программы.",
                  bg="#f4f4f6").pack(pady=8)
-        for title in ("FAQ",):
-            page = pages[title]
-            tk.Label(page, text=title, font=("Segoe UI", 15, "bold"), bg="#f4f4f6").pack(pady=25)
-            tk.Label(page, text="Раздел восстановлен в интерфейсе. Редактирование и публикация будут подключены на следующем этапе.",
-                     bg="#f4f4f6", wraplength=650).pack()
+        faq_page = pages["FAQ"]
+        tk.Label(faq_page, text="Редактор FAQ (локально)", font=("Segoe UI", 14, "bold"),
+                 bg="#f4f4f6").pack(pady=8)
+        faq_list = tk.Listbox(faq_page, height=8)
+        faq_list.pack(fill="x", padx=18)
+        tk.Label(faq_page, text="Заголовок", bg="#f4f4f6").pack()
+        faq_name = tk.Entry(faq_page, width=75)
+        faq_name.pack()
+        tk.Label(faq_page, text="Описание", bg="#f4f4f6").pack()
+        faq_description = tk.Text(faq_page, height=6, width=75)
+        faq_description.pack()
+        def refresh_faq():
+            faq_list.delete(0, "end")
+            for item in self.faq_entries:
+                faq_list.insert("end", str(item.get("name", "")) if isinstance(item, dict) else "")
+        def select_faq(event=None):
+            selected = faq_list.curselection()
+            if not selected:
+                return
+            item = self.faq_entries[selected[0]]
+            if not isinstance(item, dict):
+                return
+            faq_name.delete(0, "end")
+            faq_name.insert(0, str(item.get("name", "")))
+            faq_description.delete("1.0", "end")
+            faq_description.insert("1.0", str(item.get("description", "")))
+        faq_list.bind("<<ListboxSelect>>", select_faq)
+        def save_faq():
+            name = faq_name.get().strip()
+            description = faq_description.get("1.0", "end-1c").strip()
+            if not name:
+                messagebox.showerror("FAQ", "Введите заголовок.", parent=dialog)
+                return
+            selected = faq_list.curselection()
+            item = {"name": name, "description": description}
+            if selected:
+                self.faq_entries[selected[0]] = item
+            else:
+                self.faq_entries.append(item)
+            refresh_faq()
+        def new_faq():
+            faq_list.selection_clear(0, "end")
+            faq_name.delete(0, "end")
+            faq_description.delete("1.0", "end")
+        def delete_faq():
+            selected = faq_list.curselection()
+            if selected and messagebox.askyesno("FAQ", "Удалить выбранную запись?", parent=dialog):
+                self.faq_entries.pop(selected[0])
+                new_faq()
+                refresh_faq()
+        faq_buttons = tk.Frame(faq_page, bg="#f4f4f6")
+        faq_buttons.pack(pady=8)
+        for caption, action in (("Новая", new_faq), ("Сохранить", save_faq),
+                                ("Удалить", delete_faq), ("Просмотр FAQ", self.show_faq)):
+            tk.Button(faq_buttons, text=caption, command=action).pack(side="left", padx=5)
+        tk.Label(faq_page, text="Изменения видны в FAQ до перезапуска; публикации на сервер нет.",
+                 bg="#f4f4f6").pack()
+        refresh_faq()
         tk.Button(dialog, text="Закрыть", command=dialog.destroy).pack(pady=(0, 10))
 
     def load_cached_settings(self):
