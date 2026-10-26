@@ -328,13 +328,14 @@ class WindowsConfig(tk.Tk):
         workspace = tk.Frame(root, bg="#d7d7d7")
         workspace.pack(fill="both", expand=True, pady=(0, 3))
 
-        tabbar = self.panel(workspace)
+        tabbar = self.panel(workspace, width=65)
         tabbar.pack(side="left", fill="y", padx=(0, 5))
-        for module in MODULES:
+        tabbar.pack_propagate(False)
+        for index, module in enumerate(MODULES):
             button = tk.Button(tabbar, text=module, font=("Segoe UI", 9, "bold"),
-                               width=5, relief="raised", bd=1, padx=1, pady=7,
+                               relief="raised", bd=1, padx=1, pady=4,
                                command=lambda m=module: self.select_module(m))
-            button.pack(fill="x", padx=2, pady=3)
+            button.place(x=3, y=5 + index * 42, width=57, height=35)
             self.tabs[module] = button
 
         main = tk.Frame(workspace, bg="#d7d7d7")
