@@ -22,3 +22,7 @@ Online Supabase signed catalog verification, license activation, embedded admin 
 5. Package as a standalone Windows 10/11 executable and test on a real Windows PC.
 
 The Windows application will read the same **published** configuration as Android, but must keep separate local storage and licensing. No Supabase database schema changes are planned.
+
+## Stage 4 — signed Supabase reader (not wired into GUI yet)
+
+`supabase_publication.py` downloads the single `app_config` published row and verifies the same RSA PKCS#1 v1.5 SHA-256 signature over the exact `MAZDA6GH-SETTINGS-V2` payload used by Android. It requires `cryptography` (`pip install cryptography`) and a public Supabase publishable key supplied at runtime. It intentionally does not contain any secret keys, does not publish drafts, and does not change the Android database. Before applying the snapshot, port `AdminSnapshot.validate` and feature mapping and run parity tests against Android-signed fixtures. This stage has not been executed on a Windows computer yet.
