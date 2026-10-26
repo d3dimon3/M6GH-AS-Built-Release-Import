@@ -126,6 +126,19 @@ class WindowsConfig(tk.Tk):
                                        font=("Segoe UI", 11), anchor="w")
         self.module_details.pack(fill="x", padx=14, pady=(0, 12))
 
+        actions = tk.Frame(root, bg="#d7d7d7")
+        actions.pack(side="bottom", fill="x", pady=(4, 0))
+        for label, command in (("Открыть ABT", self.open_abt),
+                               ("Сохранить копию ABT", self.save_abt)):
+            tk.Button(actions, text=label, command=command,
+                      font=("Segoe UI", 12, "bold"), padx=16, pady=12,
+                      bg="#f4f4f6", activebackground="#e8e8ec").pack(
+                          side="left", fill="x", expand=True, padx=4)
+        self.status = tk.Label(root, text="Первый этап Windows: просмотр ABT без изменения файла",
+                               bg="#f4f4f6", fg="#202020", font=("Segoe UI", 11, "bold"),
+                               anchor="w", padx=12, pady=12,
+                               highlightbackground="#b61d31", highlightthickness=2)
+        self.status.pack(side="bottom", fill="x", pady=(6, 0))
         main = self.panel(root)
         main.pack(fill="both", expand=True, pady=(0, 10))
         tk.Label(main, text="ФУНКЦИИ БЛОКА", font=("Segoe UI", 13, "bold"),
@@ -152,19 +165,6 @@ class WindowsConfig(tk.Tk):
         self.table.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        actions = tk.Frame(root, bg="#d7d7d7")
-        actions.pack(fill="x", pady=(0, 10))
-        for label, command in (("Открыть ABT", self.open_abt),
-                               ("Сохранить копию ABT", self.save_abt)):
-            tk.Button(actions, text=label, command=command,
-                      font=("Segoe UI", 12, "bold"), padx=16, pady=12,
-                      bg="#f4f4f6", activebackground="#e8e8ec").pack(
-                          side="left", fill="x", expand=True, padx=4)
-        self.status = tk.Label(root, text="Первый этап Windows: просмотр ABT без изменения файла",
-                               bg="#f4f4f6", fg="#202020", font=("Segoe UI", 11, "bold"),
-                               anchor="w", padx=12, pady=12,
-                               highlightbackground="#b61d31", highlightthickness=2)
-        self.status.pack(fill="x", side="bottom")
         self.select_module("IC")
 
     def select_module(self, module):
@@ -283,7 +283,7 @@ class WindowsConfig(tk.Tk):
     def show_faq(self):
         dialog = tk.Toplevel(self)
         dialog.title("FAQ — M6GH AS-Built Config")
-        dialog.geometry("700x540")
+        self.center_dialog(dialog, 700, 540)
         frame = tk.Frame(dialog, bg="#f4f4f6", padx=16, pady=16)
         frame.pack(fill="both", expand=True)
         view = tk.Text(frame, wrap="word", font=("Segoe UI", 11), bg="#f4f4f6")
@@ -304,13 +304,43 @@ class WindowsConfig(tk.Tk):
             view.insert("end", chr(10) + "─" * 48 + chr(10) * 2)
         view.configure(state="disabled")
 
+    def center_dialog(self, dialog, width, height):
+        self.update_idletasks()
+        x = self.winfo_rootx() + max(0, (self.winfo_width() - width) // 2)
+        y = self.winfo_rooty() + max(0, (self.winfo_height() - height) // 2)
+        dialog.geometry(f"{width}x{height}+{x}+{y}")
+        dialog.transient(self)
+        dialog.lift()
+        dialog.focus_force()
+
     def show_about(self):
-        messagebox.showinfo("О программе",
-            "M6GH AS-Built Config — Windows" + chr(10) +
-            "IC / BCM / RKE / ABS / AFS" + chr(10) +
-            "Функции обновляются автоматически из подписанной публикации." + chr(10) +
-            "Запись изменённых ABT пока отключена." + chr(10) +
-            "Версия каталога: " + str(self.catalog_version or "не загружена"), parent=self)
+        dialog = tk.Toplevel(self)
+        dialog.title("О программе — M6GH AS-Built Config")
+        self.center_dialog(dialog, 640, 650)
+        dialog.configure(bg="#f4f4f6")
+        tk.Label(dialog, text="О программе", font=("Segoe UI", 18, "bold"),
+                 bg="#f4f4f6").pack(fill="x", pady=(18, 10))
+        tk.Label(dialog, text="M6GH AS-BUILT CONFIG", font=("Segoe UI", 17, "bold"),
+                 bg="#f4f4f6").pack(pady=(0, 10))
+        tk.Frame(dialog, bg="#c81930", height=4).pack(fill="x", padx=36, pady=(0, 12))
+        body = tk.Frame(dialog, bg="#f4f4f6")
+        body.pack(fill="both", expand=True, padx=30)
+        text = tk.Text(body, wrap="word", font=("Segoe UI", 11), bg="#f4f4f6",
+                       relief="flat", padx=8, pady=4)
+        text.pack(side="left", fill="both", expand=True)
+        bar = ttk.Scrollbar(body, command=text.yview)
+        bar.pack(side="right", fill="y")
+        text.configure(yscrollcommand=bar.set)
+        text.tag_configure("warning", foreground="#b61d31", font=("Segoe UI", 11, "bold"), justify="center")
+        text.insert("end", "M6GH AS-Built Config — для редактирования заводских конфигураций электронных блоков Mazda 6 GH.\n\n")
+        text.insert("end", "Приложение предназначено для активации и деактивации функций оборудования.\n\n")
+        text.insert("end", "Инструкция:\nСохраните исходную конфигурацию блока в FORScan в формате AS-Built. Выберите соответствующий блок и откройте ABT. После загрузки доступны функции предварительного изменения HEX.\n\n")
+        text.insert("end", "В текущей Windows-версии сохранение изменённого ABT пока не реализовано. Кнопка сохранения создаёт копию исходного файла.\n\n")
+        text.insert("end", "⚠ WARNING ⚠\nНЕ ЗАБЫВАЙТЕ ДЕЛАТЬ КОПИЮ ИСХОДНОГО ФАЙЛА НАСТРОЕК ИЗ FORSCAN.\n\n", "warning")
+        text.insert("end", "Разработчик: Dim304\nСоавтор: Wolis11\n")
+        text.configure(state="disabled")
+        tk.Button(dialog, text="Закрыть", command=dialog.destroy, bg="#c81930", fg="white",
+                  font=("Segoe UI", 12, "bold"), pady=10).pack(fill="x", padx=36, pady=16)
 
     def open_features(self):
         name = filedialog.askopenfilename(title="Локальные функции (без Supabase)",
