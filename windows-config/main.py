@@ -588,7 +588,11 @@ class WindowsConfig(tk.Tk):
         for i, field in enumerate(fields):
             tk.Label(editor, text=captions[field], bg="#f4f4f6").grid(
                 row=(i // 2) * 2, column=i % 2, sticky="w", padx=6, pady=(2, 0))
-            entry = tk.Entry(editor, width=27)
+            if field == "mode":
+                entry = ttk.Combobox(editor, values=("HEX", "BITS"), state="readonly", width=24)
+                entry.set("HEX")
+            else:
+                entry = tk.Entry(editor, width=27)
             entry.grid(row=(i // 2) * 2 + 1, column=i % 2, padx=6, pady=1)
             inputs[field] = entry
         selected = [None]
@@ -613,10 +617,13 @@ class WindowsConfig(tk.Tk):
             f = next((f for f in self.features if f.id == selected[0]), None)
             if f:
                 for field in fields:
-                    inputs[field].delete(0, "end")
-                    inputs[field].insert(0, str(getattr(f, field)))
+                    if field == "mode":
+                        inputs[field].set(str(getattr(f, field)))
+                    else:
+                        inputs[field].delete(0, "end")
+                        inputs[field].insert(0, str(getattr(f, field)))
         tree.bind("<<TreeviewSelect>>", pick)
-        def save_local():
+        def save_local(action):
             from dataclasses import replace
             from feature_engine import indices, norm
             import uuid
@@ -645,16 +652,18 @@ class WindowsConfig(tk.Tk):
                 if not values["label"] or not values["on"]:
                     raise ValueError("Заполните название функции и значение ВКЛ.")
                 previous = next((f for f in self.features if f.id == selected[0]), None)
-                candidate = replace(previous, **values) if previous else Feature(
-                    id="local-" + uuid.uuid4().hex[:12], **values)
-                if previous:
-                    self.features[self.features.index(previous)] = candidate
-                else:
+                if action == "edit" and previous is None:
+                    raise ValueError("Для изменения сначала выберите функцию в таблице.")
+                if action == "add":
+                    candidate = Feature(id="local-" + uuid.uuid4().hex[:12], **values)
                     self.features.append(candidate)
+                else:
+                    candidate = replace(previous, **values)
+                    self.features[self.features.index(previous)] = candidate
                 selected[0] = candidate.id
                 refresh_editor()
                 self.save_admin_draft_file()
-                messagebox.showinfo("Функции и биты", "Функция сохранена: " + candidate.label, parent=dialog)
+                messagebox.showinfo("Функции и биты", ("Добавлена новая функция: " if action == "add" else "Изменена функция: ") + candidate.label, parent=dialog)
                 self.status.configure(text="Админка: изменения применены локально, сервер не затронут.")
             except Exception as exc:
                 messagebox.showerror("Редактор", "Не удалось сохранить функцию: " + str(exc), parent=dialog)
@@ -664,7 +673,7 @@ class WindowsConfig(tk.Tk):
             for field in fields:
                 inputs[field].delete(0, "end")
             inputs["module"].insert(0, self.active_module)
-            inputs["mode"].insert(0, "HEX")
+            inputs["mode"].set("HEX")
             inputs["byte_index"].insert(0, "0")
         def delete_local():
             if selected[0] and messagebox.askyesno("Удалить", "Удалить функцию локально?", parent=dialog):
@@ -674,7 +683,10 @@ class WindowsConfig(tk.Tk):
                 self.save_admin_draft_file()
         controls = tk.Frame(features_page, bg="#f4f4f6")
         controls.pack()
-        for label, callback in (("Добавить новую", new_local), ("Добавить / изменить", save_local), ("Удалить", delete_local)):
+        for label, callback in (("Очистить поля", new_local),
+                                ("Добавить", lambda: save_local("add")),
+                                ("Изменить", lambda: save_local("edit")),
+                                ("Удалить", delete_local)):
             tk.Button(controls, text=label, command=callback).pack(side="left", padx=4)
         refresh_editor()
         def export_catalog():
