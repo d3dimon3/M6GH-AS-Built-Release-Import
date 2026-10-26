@@ -477,11 +477,23 @@ class WindowsConfig(tk.Tk):
             messagebox.showinfo("Экспорт", "Каталог сохранён локально. На сервер ничего не отправлено.", parent=dialog)
         tk.Button(features_page, text="Экспорт функций в JSON", command=export_catalog).pack(pady=5)
         rows_page = pages["Строки AS-Built"]
-        tk.Label(rows_page, text="Загруженные строки выбранного блока", bg="#f4f4f6",
-                 font=("Segoe UI", 12, "bold")).pack(pady=12)
-        for address, value in self.rows[:20]:
-            tk.Label(rows_page, text=f"{address}    {self.preview_rows.get(address, value)}",
-                     bg="#f4f4f6", font=("Consolas", 11)).pack(anchor="w", padx=24)
+        tk.Label(rows_page, text="Адреса каталога и строки открытого ABT (только просмотр)",
+                 bg="#f4f4f6", font=("Segoe UI", 12, "bold")).pack(pady=10)
+        row_columns = ("Блок", "Адрес", "HEX из ABT", "Функций")
+        row_tree = ttk.Treeview(rows_page, columns=row_columns, show="headings", height=15)
+        for column, width in zip(row_columns, (100, 160, 260, 100)):
+            row_tree.heading(column, text=column)
+            row_tree.column(column, width=width, anchor="center")
+        row_tree.pack(fill="both", expand=True, padx=14, pady=8)
+        addresses = set((f.module, f.address) for f in self.features)
+        addresses.update((self.active_module, address) for address, value in self.rows)
+        for module, address in sorted(addresses):
+            original = next((v for a, v in self.rows if a == address), "")
+            shown = self.preview_rows.get(address, original) if original else "—"
+            count = sum(f.module == module and f.address == address for f in self.features)
+            row_tree.insert("", "end", values=(module, address, shown, count))
+        tk.Label(rows_page, text="Адреса берутся из опубликованных функций; HEX появляется после открытия ABT.",
+                 bg="#f4f4f6", fg="#555555").pack(pady=5)
         for title in ("Блоки и доступ", "Оформление", "FAQ"):
             page = pages[title]
             tk.Label(page, text=title, font=("Segoe UI", 15, "bold"), bg="#f4f4f6").pack(pady=25)
