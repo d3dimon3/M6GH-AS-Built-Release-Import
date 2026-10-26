@@ -538,12 +538,14 @@ class WindowsConfig(tk.Tk):
         self.restore_admin_draft()
         dialog = tk.Toplevel(self)
         dialog.title("Администрирование интерфейса — Windows")
-        self.center_dialog(dialog, 790, 610)
+        screen_w, screen_h = dialog.winfo_screenwidth(), dialog.winfo_screenheight()
+        width = min(850, max(460, screen_w - 36))
+        height = min(710, max(390, screen_h - 105))
+        self.center_dialog(dialog, width, height)
         dialog.resizable(True, True)
-        dialog.minsize(900, 680)
-        dialog.geometry("1040x780")
+        dialog.minsize(min(460, width), min(390, height))
         tabs = ttk.Notebook(dialog)
-        tabs.pack(fill="both", expand=True, padx=12, pady=12)
+        tabs.pack(fill="both", expand=True, padx=6, pady=5)
         pages = {}
         for title in ("Функции и биты", "Строки AS-Built", "Блоки и доступ", "Оформление", "FAQ"):
             page = tk.Frame(tabs, bg="#f4f4f6")
@@ -551,17 +553,21 @@ class WindowsConfig(tk.Tk):
             pages[title] = page
         features_page = pages["Функции и биты"]
         columns = ("Блок", "Функция", "Адрес", "Режим", "ON", "OFF")
-        tree = ttk.Treeview(features_page, columns=columns, show="headings", height=8)
+        style = ttk.Style(dialog)
+        style.configure("M6GH.Grid.Treeview", rowheight=23, borderwidth=1, relief="solid")
+        style.configure("M6GH.Grid.Treeview.Heading", relief="solid", borderwidth=1)
+        tree = ttk.Treeview(features_page, columns=columns, show="headings", height=7,
+                            style="M6GH.Grid.Treeview")
         for column in columns:
             tree.heading(column, text=column)
-            tree.column(column, width=100 if column != "Функция" else 180)
-        tree.pack(fill="both", expand=True, padx=8, pady=8)
+            tree.column(column, width=85 if column != "Функция" else 170, minwidth=55, stretch=True)
+        tree.pack(fill="both", expand=True, padx=5, pady=4)
         tree.tag_configure("odd", background="#e7e7e7")
         tree.tag_configure("even", background="#ffffff")
         for feature in self.features:
-            tree.insert("", "end", values=(feature.module, feature.label, feature.address, feature.mode, feature.on, feature.off))
+            tree.insert("", "end", values=(feature.module, feature.label, feature.address, feature.mode, feature.on, feature.off), tags=("even" if len(tree.get_children()) % 2 == 0 else "odd",))
         tk.Label(features_page, text="Каталог из подписанной публикации. Редактирование и отправка на сервер пока не включены.",
-                 bg="#f4f4f6", fg="#8a2534", wraplength=700).pack(pady=10)
+                 bg="#f4f4f6", fg="#8a2534", wraplength=680).pack(pady=3)
         editor = tk.Frame(features_page, bg="#f4f4f6")
         editor.pack(fill="x", padx=8)
         fields = ("module", "label", "address", "mode", "indices", "on", "off", "byte_index")
@@ -573,9 +579,9 @@ class WindowsConfig(tk.Tk):
                     "off": "ВЫКЛ", "byte_index": "Номер байта"}
         for i, field in enumerate(fields):
             tk.Label(editor, text=captions[field], bg="#f4f4f6").grid(
-                row=(i // 2) * 2, column=i % 2, sticky="w", padx=12, pady=(5, 0))
-            entry = tk.Entry(editor, width=35)
-            entry.grid(row=(i // 2) * 2 + 1, column=i % 2, padx=12, pady=3)
+                row=(i // 2) * 2, column=i % 2, sticky="w", padx=6, pady=(2, 0))
+            entry = tk.Entry(editor, width=27)
+            entry.grid(row=(i // 2) * 2 + 1, column=i % 2, padx=6, pady=1)
             inputs[field] = entry
         selected = [None]
         def refresh_editor():
@@ -677,13 +683,15 @@ class WindowsConfig(tk.Tk):
         tk.Button(features_page, text="Экспорт функций в JSON", command=export_catalog).pack(pady=5)
         rows_page = pages["Строки AS-Built"]
         tk.Label(rows_page, text="Каталог адресов AS-Built", bg="#f4f4f6",
-                 font=("Segoe UI", 12, "bold")).pack(pady=10)
+                 font=("Segoe UI", 11, "bold")).pack(pady=4)
         row_columns = ("Блок", "Адрес", "HEX из ABT", "Функций")
-        row_tree = ttk.Treeview(rows_page, columns=row_columns, show="headings", height=13)
+        row_tree = ttk.Treeview(rows_page, columns=row_columns, show="headings", height=10, style="M6GH.Grid.Treeview")
         for column, width in zip(row_columns, (100, 160, 260, 100)):
             row_tree.heading(column, text=column)
             row_tree.column(column, width=width, anchor="center")
-        row_tree.pack(fill="both", expand=True, padx=14, pady=8)
+        row_tree.pack(fill="both", expand=True, padx=6, pady=4)
+        row_tree.tag_configure("odd", background="#e8e9ec")
+        row_tree.tag_configure("even", background="#ffffff")
         def refresh_rows():
             row_tree.delete(*row_tree.get_children())
             addresses = set((f.module, f.address) for f in self.features)
@@ -693,7 +701,7 @@ class WindowsConfig(tk.Tk):
                 original = next((v for a, v in self.rows if a == address), "")
                 shown = self.preview_rows.get(address, original) if original else "—"
                 count = sum(f.module == module and f.address == address for f in self.features)
-                row_tree.insert("", "end", values=(module, address, shown, count))
+                row_tree.insert("", "end", values=(module, address, shown, count), tags=("even" if len(row_tree.get_children()) % 2 == 0 else "odd",))
         controls = tk.Frame(rows_page, bg="#f4f4f6")
         controls.pack(pady=5)
         tk.Label(controls, text="Блок", bg="#f4f4f6").pack(side="left")
