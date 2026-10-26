@@ -13,6 +13,7 @@ import os
 import threading
 from snapshot_mapper import parse_snapshot
 from abt_codec import parse_checked
+from license_gate import device_id, saved_license_valid, store_license
 from supabase_publication import download_verified_row
 from publication_cache import load_verified_cache, save_verified_cache
 from feature_engine import Feature, FeatureEngine, checksum_valid
@@ -38,8 +39,51 @@ class WindowsConfig(tk.Tk):
         self.feature_vars: list[tk.BooleanVar] = []
         self.preview_rows: dict[str, str] = {}
         self.loaded_module: str | None = None
-        self._build()
-        self.after(100, self.load_cached_settings)
+        self.withdraw()
+        self.after(100, self.enforce_license)
+
+    def enforce_license(self):
+        try:
+            identifier = device_id()
+        except Exception as exc:
+            messagebox.showerror("Лицензия", "Не удалось получить Device ID: " + str(exc))
+            self.destroy()
+            return
+        if saved_license_valid(identifier):
+            self._build()
+            self.deiconify()
+            self.after(100, self.load_cached_settings)
+            return
+        dialog = tk.Toplevel(self)
+        dialog.title("Активация M6GH AS-Built Config")
+        dialog.geometry("520x320")
+        dialog.resizable(False, False)
+        dialog.protocol("WM_DELETE_WINDOW", self.destroy)
+        tk.Label(dialog, text="Активация Windows Config", font=("Segoe UI", 16, "bold")).pack(pady=(18, 8))
+        tk.Label(dialog, text="Отправьте Device ID продавцу и введите полученный ключ:").pack(pady=4)
+        tk.Label(dialog, text=identifier, font=("Consolas", 18, "bold")).pack(pady=8)
+        dialog.clipboard_clear()
+        def copy_id():
+            dialog.clipboard_clear()
+            dialog.clipboard_append(identifier)
+            messagebox.showinfo("Device ID", "Device ID скопирован", parent=dialog)
+        tk.Button(dialog, text="Копировать Device ID", command=copy_id).pack(pady=5)
+        entry = tk.Text(dialog, height=3, width=55, wrap="word")
+        entry.pack(pady=8)
+        def activate():
+            try:
+                store_license(entry.get("1.0", "end"), identifier)
+            except Exception as exc:
+                messagebox.showerror("Активация", str(exc), parent=dialog)
+                return
+            dialog.destroy()
+            self._build()
+            self.deiconify()
+            self.after(100, self.load_cached_settings)
+        tk.Button(dialog, text="АКТИВИРОВАТЬ", command=activate,
+                  bg="#c81930", fg="white", font=("Segoe UI", 11, "bold")).pack(pady=4)
+        dialog.grab_set()
+        dialog.focus_force()
 
     def panel(self, parent, **kwargs):
         return tk.Frame(parent, bg="#f4f4f6", highlightbackground="#b61d31",
