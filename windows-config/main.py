@@ -12,6 +12,7 @@ import json
 import os
 import threading
 from snapshot_mapper import parse_snapshot
+from abt_codec import parse_checked
 from supabase_publication import download_verified_row
 from publication_cache import load_verified_cache, save_verified_cache
 from feature_engine import Feature, FeatureEngine, checksum_valid
@@ -125,7 +126,7 @@ class WindowsConfig(tk.Tk):
         self.table.delete(*self.table.get_children())
         shown = 0
         for address, value in self.rows:
-            if prefix is None or address.startswith(prefix + "-"):
+            if prefix is not None and address.startswith(prefix + "-"):
                 self.table.insert("", "end", values=(address, self.preview_rows.get(address, value)))
                 shown += 1
         self.render_features()
@@ -141,10 +142,10 @@ class WindowsConfig(tk.Tk):
             if len(raw) > 2_000_000:
                 raise ValueError("Файл слишком большой")
             content = raw.decode("utf-8-sig") if not raw.startswith(b"\xff\xfe") else raw.decode("utf-16")
-            matches = [(m.group(1).upper(), " ".join(m.group(2).upper().split()))
-                       for m in ROW_PATTERN.finditer(content)]
-            if not matches:
-                raise ValueError("Строки формата 720-01-01 и HEX-значения не обнаружены")
+            parsed = parse_checked(content, {p: m for m, p in MODULES.items() if p})
+            if any(row.module != self.active_module for row in parsed):
+                raise ValueError("ABT относится к другому блоку. Выберите соответствующую вкладку.")
+            matches = [(row.address, row.value) for row in parsed]
             self.raw_file, self.source_path, self.rows = raw, Path(name), matches
             self.preview_rows.clear()
             self.engine = FeatureEngine()
