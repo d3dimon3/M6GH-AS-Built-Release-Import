@@ -15,7 +15,7 @@ import logging
 import urllib.error
 from snapshot_mapper import parse_snapshot
 from public_connection import PUBLISHABLE_KEY
-from abt_codec import parse_checked
+from abt_codec import parse_checked, serialize_changes
 from license_gate import device_id, saved_license_valid, store_license
 from supabase_publication import download_verified_row
 from publication_cache import load_verified_cache, save_verified_cache
@@ -29,9 +29,9 @@ class WindowsConfig(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("M6GH AS-Built Config — Windows")
-        self.geometry("1060x760")
+        self.geometry("900x760")
         self.resizable(False, False)
-        self.after_idle(lambda: self.center_dialog(self, 1060, 760, make_transient=False))
+        self.after_idle(lambda: self.center_dialog(self, 900, 760, make_transient=False))
         self.configure(bg="#d7d7d7")
         self.active_module = "IC"
         self.raw_file: bytes | None = None
@@ -105,7 +105,6 @@ class WindowsConfig(tk.Tk):
                            fg="#202020", font=("Segoe UI", 20, "bold"))
         top = tk.Frame(root, bg="#d7d7d7")
         top.pack(fill="x", pady=(0, 5))
-        heading.pack_forget()
         heading.pack(in_=top, side="left")
         helpbar = tk.Frame(top, bg="#d7d7d7")
         helpbar.pack(side="right")
@@ -135,16 +134,16 @@ class WindowsConfig(tk.Tk):
         actions = tk.Frame(root, bg="#d7d7d7")
         actions.pack(side="bottom", fill="x", pady=(4, 0))
         for label, command in (("Открыть ABT", self.open_abt),
-                               ("Сохранить копию ABT", self.save_abt)):
+                               ("Сохранить ABT", self.save_abt)):
             tk.Button(actions, text=label, command=command,
                       font=("Segoe UI", 12, "bold"), padx=16, pady=7,
                       bg="#f4f4f6", activebackground="#e8e8ec").pack(
                           side="left", fill="x", expand=True, padx=4)
-        self.status = tk.Label(root, text="Первый этап Windows: просмотр ABT без изменения файла",
+        self.status = tk.Label(root, text="Перед изменением сохраняйте резервную копию исходного ABT",
                                bg="#f4f4f6", fg="#202020", font=("Segoe UI", 11, "bold"),
                                anchor="w", padx=12, pady=7,
                                highlightbackground="#b61d31", highlightthickness=2)
-        self.status.pack(side="bottom", fill="x", pady=(0, 5), before=actions)
+        self.status.pack(side="bottom", fill="x", pady=(0, 5))
         main = self.panel(root)
         main.pack(fill="both", expand=True, pady=(0, 10))
         tk.Label(main, text="ФУНКЦИИ БЛОКА", font=("Segoe UI", 13, "bold"),
@@ -154,25 +153,22 @@ class WindowsConfig(tk.Tk):
                  anchor="w")
         self.features_hint.pack(fill="x", padx=14, pady=(0, 4))
         self.feature_panel = tk.Frame(main, bg="#f4f4f6")
-        self.feature_panel.pack(fill="x", padx=14, pady=(0, 12))
+        self.feature_panel.pack(fill="x", padx=14, pady=(0, 3))
         tk.Label(main, text="AS-BUILT / HEX", font=("Segoe UI", 13, "bold"),
                  bg="#f4f4f6", anchor="w").pack(fill="x", padx=14, pady=(0, 6))
 
         grid = tk.Frame(main, bg="#f4f4f6")
         grid.pack(fill="both", expand=True, padx=14, pady=(0, 12))
         style = ttk.Style(self)
-        style.configure("M6GH.Treeview", font=("Consolas", 13), rowheight=32)
+        style.configure("M6GH.Treeview", font=("Consolas", 12), rowheight=27)
         style.configure("M6GH.Treeview.Heading", font=("Segoe UI", 12, "bold"))
         self.table = ttk.Treeview(grid, columns=("address", "value"), show="headings", style="M6GH.Treeview")
         self.table.heading("address", text="Адрес строки")
         self.table.heading("value", text="Значение HEX")
-        self.table.column("address", width=250, minwidth=220, stretch=False, anchor="center")
-        self.table.column("value", width=650, stretch=True, anchor="center")
-        scrollbar = ttk.Scrollbar(grid, orient="vertical", command=self.table.yview)
-        self.table.configure(yscrollcommand=scrollbar.set)
+        self.table.column("address", width=240, minwidth=190, stretch=True, anchor="center")
+        self.table.column("value", width=510, stretch=True, anchor="center")
         self.table.tag_configure("changed", foreground="#c81930")
         self.table.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
 
         self.select_module("IC")
 
@@ -193,7 +189,7 @@ class WindowsConfig(tk.Tk):
                 self.table.insert("", "end", values=(address, self.preview_rows.get(address, value)), tags=("changed",) if self.preview_rows.get(address, value) != value else ())
                 shown += 1
         self.render_features()
-        self.status.configure(text=f"{module}: строк {shown}. HEX — предварительный просмотр; запись отключена.")
+        self.status.configure(text=f"{module}: строк {shown}. HEX — просмотр изменений; сохраняйте новый ABT.")
 
     def open_abt(self):
         name = filedialog.askopenfilename(title="Открыть AS-Built",
@@ -218,7 +214,7 @@ class WindowsConfig(tk.Tk):
                 if feature.module == self.active_module and row is not None:
                     self.engine.seed(feature, self.engine.state(feature, row))
             self.select_module(self.active_module)
-            self.status.configure(text=f"Загружен {self.source_path.name}: {len(matches)} строк. Только просмотр.")
+            self.status.configure(text=f"Загружен {self.source_path.name}: {len(matches)} строк. Изменения можно сохранить в новый ABT.")
         except (OSError, UnicodeError, ValueError) as exc:
             messagebox.showerror("Ошибка открытия ABT", str(exc))
 
@@ -347,7 +343,7 @@ class WindowsConfig(tk.Tk):
         text.insert("end", "M6GH AS-Built Config — для редактирования заводских конфигураций электронных блоков Mazda 6 GH.\n\n")
         text.insert("end", "Приложение предназначено для активации и деактивации функций оборудования.\n\n")
         text.insert("end", "Инструкция:\nСохраните исходную конфигурацию блока в FORScan в формате AS-Built. Выберите соответствующий блок и откройте ABT. После загрузки доступны функции предварительного изменения HEX.\n\n")
-        text.insert("end", "В текущей Windows-версии сохранение изменённого ABT пока не реализовано. Кнопка сохранения создаёт копию исходного файла.\n\n")
+        text.insert("end", "После изменения функций сохраните новый ABT и проверьте его перед программированием в FORScan.\n\n")
         text.insert("end", "⚠ WARNING ⚠\nНЕ ЗАБЫВАЙТЕ ДЕЛАТЬ КОПИЮ ИСХОДНОГО ФАЙЛА НАСТРОЕК ИЗ FORSCAN.\n\n", "warning")
         text.insert("end", "Разработчик: Dim304\nСоавтор: Wolis11\n")
         text.configure(state="disabled")
@@ -399,7 +395,7 @@ class WindowsConfig(tk.Tk):
         if not relevant:
             self.features_hint.configure(text="Нет загруженных функций этого блока")
             return
-        self.features_hint.configure(text="Локальные функции: изменения только в памяти (не сохраняются в ABT)")
+        self.features_hint.configure(text="Функции каталога: изменения сохраняются в новый ABT")
         for i, feature in enumerate(relevant):
             original = next((v for a, v in self.rows if a == feature.address), None)
             value = self.preview_rows.get(feature.address, original) if original else None
@@ -410,7 +406,7 @@ class WindowsConfig(tk.Tk):
                                  fg="#222222", selectcolor="#f4f4f6",
                                  font=("Segoe UI", 10),
                                  command=lambda f=feature, v=var: self.toggle_feature(f, v))
-            box.grid(row=i // 3, column=i % 3, sticky="w", padx=8, pady=3)
+            box.grid(row=i // 3, column=i % 3, sticky="w", padx=6, pady=1)
             if value is None:
                 box.configure(state="disabled")
 
@@ -435,19 +431,31 @@ class WindowsConfig(tk.Tk):
             messagebox.showerror("Изменение отклонено", str(exc))
 
     def save_abt(self):
-        if self.raw_file is None:
-            messagebox.showinfo("Нет файла", "Сначала откройте ABT.")
+        if self.raw_file is None or self.loaded_module != self.active_module:
+            messagebox.showinfo("Нет файла", "Откройте ABT выбранного блока.")
             return
-        name = filedialog.asksaveasfilename(title="Сохранить исходную копию ABT",
-                                             defaultextension=".abt",
-                                             initialfile=(self.source_path.stem + "_copy.abt"
-                                                          if self.source_path else "copy.abt"))
-        if name:
-            try:
-                Path(name).write_bytes(self.raw_file)
-                self.status.configure(text="Сохранена точная копия исходного файла. Данные не изменялись.")
-            except OSError as exc:
-                messagebox.showerror("Ошибка сохранения", str(exc))
+        changes = {address: value for address, value in self.preview_rows.items()
+                   if any(a == address and original != value for a, original in self.rows)}
+        if not changes and not messagebox.askyesno("Без изменений", "Изменений нет. Сохранить копию исходного ABT?"):
+            return
+        name = filedialog.asksaveasfilename(title="Сохранить изменённый ABT",
+                    defaultextension=".abt",
+                    initialfile=(self.source_path.stem + "_modified.abt" if self.source_path else "modified.abt"))
+        if not name:
+            return
+        try:
+            destination = Path(name)
+            if self.source_path and destination.resolve() == self.source_path.resolve():
+                raise ValueError("Исходный ABT нельзя перезаписывать. Выберите другое имя.")
+            encoding = ("utf-16" if self.raw_file.startswith((bytes.fromhex("FFFE"), bytes.fromhex("FEFF")))
+                        else ("utf-8-sig" if self.raw_file.startswith(bytes.fromhex("EFBBBF")) else "utf-8"))
+            updated = serialize_changes(self.raw_file.decode(encoding), changes,
+                                        {v: k for k, v in MODULES.items()})
+            destination.write_bytes(updated.encode(encoding))
+            self.status.configure(text=f"Сохранено: {destination.name}. Изменённых строк: {len(changes)}.")
+            messagebox.showinfo("ABT сохранён", f"Сохранено: {destination.name}. Изменённых строк: {len(changes)}. Исходный файл не изменён.")
+        except (OSError, ValueError, UnicodeError) as exc:
+            messagebox.showerror("Ошибка сохранения ABT", str(exc))
 
 
 if __name__ == "__main__":
