@@ -5,6 +5,7 @@ on:
     branches: [windows-config-v1]
     paths:
       - '.github/workflows/windows-config-build.yml'
+      - 'windows-config/**'
 
 permissions:
   contents: read
