@@ -394,7 +394,9 @@ class WindowsConfig(tk.Tk):
         dialog = tk.Toplevel(self)
         dialog.title("Администрирование интерфейса — Windows")
         self.center_dialog(dialog, 790, 610)
-        dialog.resizable(False, False)
+        dialog.resizable(True, True)
+        dialog.minsize(900, 680)
+        dialog.geometry("1040x780")
         tabs = ttk.Notebook(dialog)
         tabs.pack(fill="both", expand=True, padx=12, pady=12)
         pages = {}
@@ -409,6 +411,8 @@ class WindowsConfig(tk.Tk):
             tree.heading(column, text=column)
             tree.column(column, width=100 if column != "Функция" else 180)
         tree.pack(fill="both", expand=True, padx=8, pady=8)
+        tree.tag_configure("odd", background="#e7e7e7")
+        tree.tag_configure("even", background="#ffffff")
         for feature in self.features:
             tree.insert("", "end", values=(feature.module, feature.label, feature.address, feature.mode, feature.on, feature.off))
         tk.Label(features_page, text="Каталог из подписанной публикации. Редактирование и отправка на сервер пока не включены.",
@@ -416,6 +420,7 @@ class WindowsConfig(tk.Tk):
         editor = tk.Frame(features_page, bg="#f4f4f6")
         editor.pack(fill="x", padx=8)
         fields = ("module", "label", "address", "mode", "indices", "on", "off", "byte_index")
+        field_labels = ("Модуль", "Надпись / функция", "Строка", "Режим HEX/BITS", "HEX индексы / биты", "ВКЛ", "ВЫКЛ", "Номер байта")
         inputs = {}
         captions = {"module": "Модуль", "label": "Надпись / функция",
                     "address": "Строка AS-Built", "mode": "Режим HEX/BITS",
@@ -430,8 +435,8 @@ class WindowsConfig(tk.Tk):
         selected = [None]
         def refresh_editor():
             tree.delete(*tree.get_children())
-            for f in self.features:
-                tree.insert("", "end", values=(f.module, f.label, f.address, f.mode, f.on, f.off), tags=(f.id,))
+            for number, f in enumerate(self.features):
+                tree.insert("", "end", values=(f.module, f.label, f.address, f.mode, f.on, f.off), tags=(f.id, "odd" if number % 2 else "even"))
             self.engine = FeatureEngine()
             for f in self.features:
                 original = next((v for a, v in self.rows if a == f.address), None)
@@ -487,13 +492,14 @@ class WindowsConfig(tk.Tk):
                     self.features.append(candidate)
                 selected[0] = candidate.id
                 refresh_editor()
+                messagebox.showinfo("Функции и биты", "Функция сохранена в локальном каталоге: " + candidate.label, parent=dialog)
                 messagebox.showinfo("Функция сохранена", "Функция добавлена или изменена в локальном каталоге.", parent=dialog)
                 self.status.configure(text="Админка: изменения применены локально, сервер не затронут.")
-            except (ValueError, TypeError) as exc:
-                messagebox.showerror("Редактор", str(exc), parent=dialog)
+            except Exception as exc:
+                messagebox.showerror("Редактор", "Не удалось сохранить функцию: " + str(exc), parent=dialog)
         def new_local():
             selected[0] = None
-            tree.selection_remove(tree.selection())
+            tree.selection_remove(*tree.selection())
             for field in fields:
                 inputs[field].delete(0, "end")
             inputs["module"].insert(0, self.active_module)
