@@ -111,9 +111,9 @@ class WindowsConfig(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("M6GH AS-Built Config — Windows")
-        self.geometry("900x760")
+        self.geometry("900x820")
         self.resizable(False, False)
-        self.after_idle(lambda: self.center_dialog(self, 900, 760, make_transient=False))
+        self.after_idle(lambda: self.center_dialog(self, 900, 820, make_transient=False))
         self.configure(bg="#d7d7d7")
         self.active_module = "IC"
         self.raw_file: bytes | None = None
