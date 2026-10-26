@@ -133,6 +133,8 @@ class WindowsConfig(tk.Tk):
         self.admin_extra_rows = set()
         self.admin_visible_modules = set(MODULES)
         self.admin_heading = "M6GH AS-BUILT CONFIG"
+        self.admin_open_caption = "Открыть ABT"
+        self.admin_save_caption = "Сохранить ABT"
         self.catalog_version = None
         self.withdraw()
         self.after(100, self.enforce_license)
@@ -225,12 +227,14 @@ class WindowsConfig(tk.Tk):
 
         actions = tk.Frame(root, bg="#d7d7d7")
         actions.pack(side="bottom", fill="x", pady=(4, 0))
-        for label, command in (("Открыть ABT", self.open_abt),
-                               ("Сохранить ABT", self.save_abt)):
-            tk.Button(actions, text=label, command=command,
+        self.action_buttons = []
+        for label, command in ((self.admin_open_caption, self.open_abt),
+                               (self.admin_save_caption, self.save_abt)):
+            button = tk.Button(actions, text=label, command=command,
                       font=("Segoe UI", 12, "bold"), padx=16, pady=7,
                       bg="#f4f4f6", activebackground="#e8e8ec").pack(
                           side="left", fill="x", expand=True, padx=4)
+            self.action_buttons.append(button)
         self.status = tk.Label(root, wraplength=810, text="Перед изменением сохраняйте резервную копию исходного ABT",
                                bg="#f4f4f6", fg="#202020", font=("Segoe UI", 9),
                                anchor="w", padx=8, pady=5,
@@ -378,6 +382,10 @@ class WindowsConfig(tk.Tk):
         self.admin_visible_modules = visible
         self.admin_extra_rows = extra
         self.admin_heading = heading
+        self.admin_open_caption = str(data.get("open_caption", self.admin_open_caption))
+        self.admin_save_caption = str(data.get("save_caption", self.admin_save_caption))
+        for button, caption in zip(self.action_buttons, (self.admin_open_caption, self.admin_save_caption)):
+            button.configure(text=caption)
         self.faq_entries = faq
         self.heading_label.configure(text=heading)
         for module, button in self.tabs.items():
@@ -605,21 +613,36 @@ class WindowsConfig(tk.Tk):
             self.status.configure(text="Отображение блоков изменено локально.")
         tk.Button(access_page, text="Применить", command=apply_access).pack(pady=15)
         appearance = pages["Оформление"]
-        tk.Label(appearance, text="Заголовок окна", font=("Segoe UI", 14, "bold"),
-                 bg="#f4f4f6").pack(pady=20)
-        title_input = tk.Entry(appearance, width=46)
-        title_input.insert(0, self.admin_heading)
-        title_input.pack(pady=8)
-        def apply_title():
-            value = title_input.get().strip()
-            if not 1 <= len(value) <= 45:
-                messagebox.showerror("Оформление", "Введите от 1 до 45 символов.", parent=dialog)
+        tk.Label(appearance, text="Оформление приложения", font=("Segoe UI", 15, "bold"),
+                 bg="#f4f4f6").pack(pady=14)
+        appearance_fields = tk.Frame(appearance, bg="#f4f4f6")
+        appearance_fields.pack(padx=22, fill="x")
+        appearance_entries = {}
+        for row, (key, label, value) in enumerate((
+            ("heading", "Название окна", self.admin_heading),
+            ("open", "Кнопка открытия", self.admin_open_caption),
+            ("save", "Кнопка сохранения", self.admin_save_caption),
+        )):
+            tk.Label(appearance_fields, text=label, bg="#f4f4f6", anchor="w",
+                     font=("Segoe UI", 11)).grid(row=row, column=0, sticky="w", padx=10, pady=10)
+            entry = tk.Entry(appearance_fields, width=55, font=("Segoe UI", 11))
+            entry.insert(0, value)
+            entry.grid(row=row, column=1, padx=10, pady=10, sticky="ew")
+            appearance_entries[key] = entry
+        appearance_fields.columnconfigure(1, weight=1)
+        def apply_appearance():
+            values = {key: entry.get().strip() for key, entry in appearance_entries.items()}
+            if any(not value or len(value) > 45 for value in values.values()):
+                messagebox.showerror("Оформление", "Заполните все поля (не более 45 символов).", parent=dialog)
                 return
-            self.admin_heading = value
-            self.heading_label.configure(text=value)
-        tk.Button(appearance, text="Применить заголовок", command=apply_title).pack(pady=10)
-        tk.Label(appearance, text="Изменение локальное, до выхода из программы.",
-                 bg="#f4f4f6").pack(pady=8)
+            self.admin_heading = values["heading"]
+            self.admin_open_caption = values["open"]
+            self.admin_save_caption = values["save"]
+            self.heading_label.configure(text=self.admin_heading)
+            for button, caption in zip(self.action_buttons, (self.admin_open_caption, self.admin_save_caption)):
+                button.configure(text=caption)
+            messagebox.showinfo("Оформление", "Надписи применены. Закройте админку для сохранения.", parent=dialog)
+        tk.Button(appearance, text="Сохранить оформление", command=apply_appearance).pack(pady=15)
         faq_page = pages["FAQ"]
         tk.Label(faq_page, text="Редактор FAQ (локально)", font=("Segoe UI", 14, "bold"),
                  bg="#f4f4f6").pack(pady=8)
@@ -691,6 +714,8 @@ class WindowsConfig(tk.Tk):
                 "extra_rows": [list(item) for item in sorted(self.admin_extra_rows)],
                 "visible_modules": sorted(self.admin_visible_modules),
                 "heading": self.admin_heading,
+                "open_caption": self.admin_open_caption,
+                "save_caption": self.admin_save_caption,
                 "faq": self.faq_entries,
             }
             try:
@@ -745,6 +770,8 @@ class WindowsConfig(tk.Tk):
                     "extra_rows": [list(item) for item in sorted(self.admin_extra_rows)],
                     "visible_modules": sorted(self.admin_visible_modules),
                     "heading": self.admin_heading,
+                    "open_caption": self.admin_open_caption,
+                    "save_caption": self.admin_save_caption,
                     "faq": self.faq_entries,
                 }
                 temporary = destination.with_suffix(".tmp")
