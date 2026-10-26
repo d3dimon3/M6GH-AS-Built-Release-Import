@@ -374,6 +374,20 @@ class WindowsConfig(tk.Tk):
             tree.insert("", "end", values=(feature.module, feature.label, feature.address, feature.mode, feature.on, feature.off))
         tk.Label(features_page, text="Каталог из подписанной публикации. Редактирование и отправка на сервер пока не включены.",
                  bg="#f4f4f6", fg="#8a2534", wraplength=700).pack(pady=10)
+        def export_catalog():
+            destination = filedialog.asksaveasfilename(parent=dialog, title="Сохранить каталог функций",
+                defaultextension=".json", filetypes=[("JSON", "*.json")])
+            if not destination:
+                return
+            from dataclasses import asdict
+            payload = {"features": [asdict(feature) for feature in self.features]}
+            try:
+                Path(destination).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            except OSError as exc:
+                messagebox.showerror("Экспорт", str(exc), parent=dialog)
+                return
+            messagebox.showinfo("Экспорт", "Каталог сохранён локально. На сервер ничего не отправлено.", parent=dialog)
+        tk.Button(features_page, text="Экспорт функций в JSON", command=export_catalog).pack(pady=5)
         rows_page = pages["Строки AS-Built"]
         tk.Label(rows_page, text="Загруженные строки выбранного блока", bg="#f4f4f6",
                  font=("Segoe UI", 12, "bold")).pack(pady=12)
