@@ -12,7 +12,8 @@ import json
 import os
 import threading
 from snapshot_mapper import parse_snapshot
-from supabase_publication import download_verified
+from supabase_publication import download_verified_row
+from publication_cache import load_verified_cache, save_verified_cache
 from feature_engine import Feature, FeatureEngine, checksum_valid
 
 MODULES = {"IC": "720", "BCM": "726", "RKE": None, "ABS": None, "AFS": None}
@@ -37,6 +38,7 @@ class WindowsConfig(tk.Tk):
         self.preview_rows: dict[str, str] = {}
         self.loaded_module: str | None = None
         self._build()
+        self.after(100, self.load_cached_settings)
 
     def panel(self, parent, **kwargs):
         return tk.Frame(parent, bg="#f4f4f6", highlightbackground="#b61d31",
@@ -156,6 +158,23 @@ class WindowsConfig(tk.Tk):
         except (OSError, UnicodeError, ValueError) as exc:
             messagebox.showerror("Ошибка открытия ABT", str(exc))
 
+    def load_cached_settings(self):
+        try:
+            publication = load_verified_cache()
+            if publication is None:
+                return
+            features = parse_snapshot(publication.snapshot)
+            self.features = features
+            self.engine = FeatureEngine()
+            for feature in features:
+                original = next((v for a, v in self.rows if a == feature.address), None)
+                if original is not None:
+                    self.engine.seed(feature, self.engine.state(feature, original))
+            self.select_module(self.active_module)
+            self.status.configure(text=f"Офлайн: проверенная публикация v{publication.version}.")
+        except Exception as exc:
+            self.status.configure(text="Офлайн-кэш отклонён: " + str(exc)[:120])
+
     def refresh_online(self):
         # The publishable key is supplied at runtime, never committed to GitHub.
         url = os.environ.get("M6GH_SUPABASE_URL", "https://zyksvoauffhexketcyrq.supabase.co")
@@ -166,7 +185,7 @@ class WindowsConfig(tk.Tk):
         self.status.configure(text="Проверка подписи и загрузка настроек...")
         def worker():
             try:
-                publication = download_verified(url, key)
+                publication = save_verified_cache(download_verified_row(url, key))
                 features = parse_snapshot(publication.snapshot)
             except Exception as exc:
                 error = str(exc)
