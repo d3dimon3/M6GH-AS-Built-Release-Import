@@ -42,6 +42,8 @@ class WindowsConfig(tk.Tk):
         self.feature_vars: list[tk.BooleanVar] = []
         self.preview_rows: dict[str, str] = {}
         self.loaded_module: str | None = None
+        self.faq_entries = []
+        self.catalog_version = None
         self.withdraw()
         self.after(100, self.enforce_license)
 
@@ -101,6 +103,10 @@ class WindowsConfig(tk.Tk):
         heading = tk.Label(root, text="M6GH AS-BUILT CONFIG", bg="#d7d7d7",
                            fg="#202020", font=("Segoe UI", 20, "bold"))
         heading.pack(anchor="w", pady=(0, 12))
+        helpbar = tk.Frame(root, bg="#d7d7d7")
+        helpbar.pack(anchor="e", pady=(0, 8))
+        tk.Button(helpbar, text="FAQ", command=self.show_faq).pack(side="left", padx=4)
+        tk.Button(helpbar, text="О программе", command=self.show_about).pack(side="left", padx=4)
 
         tabbar = self.panel(root)
         tabbar.pack(fill="x", pady=(0, 10))
@@ -142,6 +148,7 @@ class WindowsConfig(tk.Tk):
         self.table.column("value", width=650, stretch=True)
         scrollbar = ttk.Scrollbar(grid, orient="vertical", command=self.table.yview)
         self.table.configure(yscrollcommand=scrollbar.set)
+        self.table.tag_configure("changed", foreground="#c81930")
         self.table.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
@@ -157,7 +164,7 @@ class WindowsConfig(tk.Tk):
                                bg="#f4f4f6", fg="#202020", font=("Segoe UI", 11, "bold"),
                                anchor="w", padx=12, pady=12,
                                highlightbackground="#b61d31", highlightthickness=2)
-        self.status.pack(fill="x")
+        self.status.pack(fill="x", side="bottom")
         self.select_module("IC")
 
     def select_module(self, module):
@@ -174,7 +181,7 @@ class WindowsConfig(tk.Tk):
         shown = 0
         for address, value in self.rows:
             if prefix is not None and address.startswith(prefix + "-"):
-                self.table.insert("", "end", values=(address, self.preview_rows.get(address, value)))
+                self.table.insert("", "end", values=(address, self.preview_rows.get(address, value)), tags=("changed",) if self.preview_rows.get(address, value) != value else ())
                 shown += 1
         self.render_features()
         self.status.configure(text=f"{module}: строк {shown}. HEX — предварительный просмотр; запись отключена.")
@@ -213,6 +220,7 @@ class WindowsConfig(tk.Tk):
                 return
             features = parse_snapshot(publication.snapshot)
             self.features = features
+            self.apply_publication_metadata(publication.snapshot, publication.version)
             self.engine = FeatureEngine()
             for feature in features:
                 original = next((v for a, v in self.rows if a == feature.address), None)
@@ -251,6 +259,7 @@ class WindowsConfig(tk.Tk):
                 return
             def apply():
                 self.features = features
+                self.apply_publication_metadata(publication.snapshot, publication.version)
                 self.preview_rows.clear()
                 self.engine = FeatureEngine()
                 for feature in features:
@@ -261,6 +270,47 @@ class WindowsConfig(tk.Tk):
                 self.status.configure(text=f"Настройки обновлены автоматически: версия {publication.version}, функций {len(features)}.")
             self.after(0, apply)
         threading.Thread(target=worker, daemon=True).start()
+
+    def apply_publication_metadata(self, snapshot, version):
+        self.catalog_version = version
+        try:
+            raw = snapshot.get("stores", {}).get("studio_faq", {}).get("entries", "[]")
+            entries = json.loads(raw)
+            self.faq_entries = entries if isinstance(entries, list) else []
+        except (ValueError, TypeError, AttributeError):
+            self.faq_entries = []
+
+    def show_faq(self):
+        dialog = tk.Toplevel(self)
+        dialog.title("FAQ — M6GH AS-Built Config")
+        dialog.geometry("700x540")
+        frame = tk.Frame(dialog, bg="#f4f4f6", padx=16, pady=16)
+        frame.pack(fill="both", expand=True)
+        view = tk.Text(frame, wrap="word", font=("Segoe UI", 11), bg="#f4f4f6")
+        view.pack(side="left", fill="both", expand=True)
+        bar = ttk.Scrollbar(frame, orient="vertical", command=view.yview)
+        bar.pack(side="right", fill="y")
+        view.configure(yscrollcommand=bar.set)
+        view.tag_configure("heading", foreground="#b61d31", font=("Segoe UI", 12, "bold"))
+        if not self.faq_entries:
+            view.insert("end", "Пока нет опубликованных записей FAQ.")
+        for item in self.faq_entries:
+            if not isinstance(item, dict):
+                continue
+            view.insert("end", str(item.get("name", "")) + chr(10), "heading")
+            view.insert("end", str(item.get("description", "")) + chr(10))
+            if item.get("extra_text"):
+                view.insert("end", str(item["extra_text"]) + chr(10))
+            view.insert("end", chr(10) + "─" * 48 + chr(10) * 2)
+        view.configure(state="disabled")
+
+    def show_about(self):
+        messagebox.showinfo("О программе",
+            "M6GH AS-Built Config — Windows" + chr(10) +
+            "IC / BCM / RKE / ABS / AFS" + chr(10) +
+            "Функции обновляются автоматически из подписанной публикации." + chr(10) +
+            "Запись изменённых ABT пока отключена." + chr(10) +
+            "Версия каталога: " + str(self.catalog_version or "не загружена"), parent=self)
 
     def open_features(self):
         name = filedialog.askopenfilename(title="Локальные функции (без Supabase)",
