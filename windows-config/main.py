@@ -1505,3 +1505,5 @@ class WindowsConfig(tk.Tk):
 
 if __name__ == "__main__":
     WindowsConfig().mainloop()
+
+# Rebuild Windows x86/x64 artifacts after FAQ editor update.
