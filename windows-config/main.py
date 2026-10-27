@@ -1278,28 +1278,41 @@ class WindowsConfig(tk.Tk):
     def show_about(self):
         dialog = tk.Toplevel(self)
         dialog.title("О программе — M6GH AS-Built Config")
-        self.center_dialog(dialog, 640, 650)
-        dialog.resizable(False, False)
         dialog.configure(bg="#f4f4f6")
-        tk.Label(dialog, text="О программе", font=("Segoe UI", 18, "bold"),
-                 bg="#f4f4f6").pack(fill="x", pady=(18, 10))
-        tk.Label(dialog, text="M6GH AS-BUILT CONFIG", font=("Segoe UI", 17, "bold"),
-                 bg="#f4f4f6").pack(pady=(0, 10))
-        tk.Frame(dialog, bg="#c81930", height=4).pack(fill="x", padx=36, pady=(0, 12))
-        main = tk.Frame(dialog, bg="#f4f4f6", padx=25)
-        main.pack(fill="both", expand=True)
-        description_border = tk.Frame(main, bg="#ffffff", highlightbackground="#c81930",
-                                      highlightthickness=1)
-        description_border.pack(fill="both", expand=True, pady=(0, 12))
-        text = tk.Text(description_border, wrap="word", font=("Segoe UI", 10),
-                       bg="#ffffff", relief="flat", padx=9, pady=8, height=11)
-        text.pack(side="left", fill="both", expand=True)
-        scrollbar = ttk.Scrollbar(description_border, command=text.yview)
-        scrollbar.pack(side="right", fill="y")
-        text.configure(yscrollcommand=scrollbar.set)
+        dialog.resizable(False, False)
+        panel_bg = "#e9e9ee"
+        border = "#c81930"
+        outer = tk.Frame(dialog, bg="#f4f4f6", padx=14, pady=12)
+        outer.pack(fill="both", expand=True)
+
+        title_box = tk.Canvas(outer, height=37, bg="#f4f4f6",
+                              highlightthickness=0, bd=0)
+        title_box.pack(fill="x", pady=(0, 7))
+        def draw_title(event=None):
+            w = max(10, title_box.winfo_width())
+            title_box.delete("all")
+            r = 8
+            title_box.create_polygon(r, 1, w-r, 1, w-1, r, w-1, 36-r,
+                                     w-r, 36, r, 36, 1, 36-r, 1, r,
+                                     smooth=True, splinesteps=12,
+                                     fill="#dedee3", outline="#bfc0c8", width=1)
+            title_box.create_text(w//2, 18, text="О программе",
+                                  font=("Segoe UI", 13, "bold"), fill="#222222")
+        title_box.bind("<Configure>", draw_title)
+        tk.Label(outer, text="M6GH AS-BUILT CONFIG",
+                 font=("Segoe UI", 12, "bold"), bg="#f4f4f6").pack(pady=(0, 5))
+        tk.Frame(outer, bg=border, height=3).pack(fill="x", pady=(0, 8))
+
+        description_border = tk.Frame(outer, bg=panel_bg, highlightbackground=border,
+                                      highlightthickness=3, padx=8, pady=7)
+        description_border.pack(fill="x", pady=(0, 9))
+        text = tk.Text(description_border, wrap="word", font=("Segoe UI", 9),
+                       bg=panel_bg, relief="flat", padx=0, pady=0,
+                       borderwidth=0, highlightthickness=0, width=65, height=1)
+        text.pack(fill="x")
         for tag, options in {
-            "bold": {"font": ("Segoe UI", 10, "bold")},
-            "italic": {"font": ("Segoe UI", 10, "italic")},
+            "bold": {"font": ("Segoe UI", 9, "bold")},
+            "italic": {"font": ("Segoe UI", 9, "italic")},
             "underline": {"underline": True},
             "strike": {"overstrike": True},
         }.items():
@@ -1325,31 +1338,53 @@ class WindowsConfig(tk.Tk):
         markup = Markup()
         markup.feed(self.admin_about_description)
         markup.close()
-        text.configure(state="disabled")
-        warning = tk.Frame(main, bg="#ffffff", highlightbackground="#c81930",
-                           highlightthickness=1, padx=8, pady=9)
-        warning.pack(fill="x", pady=(0, 12))
-        tk.Label(warning, text=self.admin_warning_title, font=("Segoe UI", 11, "bold"),
-                 bg="#ffffff", fg="#b61d31").pack(fill="x")
-        tk.Label(warning, text=self.admin_warning_text, font=("Segoe UI", 10, "bold"),
-                 bg="#ffffff", fg="#b61d31", wraplength=520,
-                 justify="center").pack(fill="x", pady=(3, 0))
-        authors = tk.Frame(main, bg="#f4f4f6")
+
+        warning = tk.Frame(outer, bg=panel_bg, highlightbackground=border,
+                           highlightthickness=3, padx=7, pady=7)
+        warning.pack(fill="x", pady=(0, 9))
+        tk.Label(warning, text=self.admin_warning_title,
+                 font=("Segoe UI", 10, "bold"), bg=panel_bg,
+                 fg="#b61d31").pack(fill="x")
+        tk.Label(warning, text=self.admin_warning_text,
+                 font=("Segoe UI", 9, "bold"), bg=panel_bg,
+                 fg="#b61d31", wraplength=450,
+                 justify="center").pack(fill="x", pady=(2, 0))
+
+        authors = tk.Frame(outer, bg="#f4f4f6")
         authors.pack(fill="x", pady=(0, 5))
         for role, name, link in self.admin_authors:
             line = tk.Frame(authors, bg="#f4f4f6")
             line.pack(fill="x", pady=1)
-            tk.Label(line, text=role + ": ", bg="#f4f4f6", font=("Segoe UI", 9)).pack(side="left")
+            tk.Label(line, text=role + ": ", bg="#f4f4f6",
+                     font=("Segoe UI", 9)).pack(side="left")
             tk.Label(line, text="D", bg="#d50032", fg="white",
                      font=("Arial", 9, "bold"), padx=3).pack(side="left", padx=(0, 5))
+            valid_link = link.startswith(("https://", "http://"))
             author = tk.Label(line, text=name, bg="#f4f4f6", fg="#1264a3",
-                              cursor="hand2" if link.startswith(("https://", "http://")) else "arrow",
+                              cursor="hand2" if valid_link else "arrow",
                               font=("Segoe UI", 9, "underline"))
             author.pack(side="left")
-            if link.startswith(("https://", "http://")):
+            if valid_link:
                 author.bind("<Button-1>", lambda event, url=link: webbrowser.open(url))
-        tk.Button(dialog, text="Закрыть", command=dialog.destroy, bg="#c81930", fg="white",
-                  font=("Segoe UI", 10, "bold"), pady=6).pack(fill="x", padx=36, pady=10)
+        tk.Button(outer, text="Закрыть", command=dialog.destroy,
+                  bg=border, fg="white", font=("Segoe UI", 9, "bold"),
+                  pady=5).pack(fill="x", pady=(5, 0))
+
+        # Grow the text and dialog to fit the configured description; no scrollbars.
+        # Cap the initial width to remain usable on low-resolution x86 tablets.
+        def fit_dialog():
+            if not dialog.winfo_exists():
+                return
+            text.configure(state="normal")
+            text.update_idletasks()
+            display_lines = text.count("1.0", "end-1c", "displaylines")
+            lines = max(1, int(display_lines[0]) if display_lines else 1)
+            text.configure(height=lines + 1, state="disabled")
+            dialog.update_idletasks()
+            width = min(540, max(430, dialog.winfo_reqwidth()))
+            height = dialog.winfo_reqheight()
+            self.center_dialog(dialog, width, height)
+        dialog.after_idle(fit_dialog)
 
     def open_features(self):
         name = filedialog.askopenfilename(title="Локальные функции (без Supabase)",
