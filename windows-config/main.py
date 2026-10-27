@@ -27,6 +27,7 @@ from publication_cache import load_verified_cache, save_verified_cache
 from feature_engine import Feature, FeatureEngine, checksum_valid
 
 MODULES = {"IC": "720", "BCM": "726", "RKE": "731", "ABS": "760", "AFS": "737"}
+MODULE_NAMES = {"IC":"Instrument Cluster","BCM":"Body Control Module","RKE":"Remote Keyless Entry","ABS":"Anti-lock Brake System","AFS":"Adaptive Front-lighting System"}
 ROW_PATTERN = re.compile(r"(?<![A-Za-z0-9])([0-9A-Fa-f]{3}-[0-9A-Fa-f]{2}-[0-9A-Fa-f]{2})\s+((?:[0-9A-Fa-f]{2,4}[ \t]+)*[0-9A-Fa-f]{2,4})(?![A-Za-z0-9])")
 
 
@@ -220,7 +221,7 @@ class WindowsConfig(tk.Tk):
         self.admin_authenticated = False
         self.admin_extra_rows = set()
         self.admin_visible_modules = set(MODULES)
-        self.admin_module_info = {m: {"name": m, "version": ""} for m in MODULES}
+        self.admin_module_info = {m: {"name": MODULE_NAMES[m], "version": ""} for m in MODULES}
         self.admin_heading = "M6GH AS-BUILT CONFIG"
         self.admin_open_caption = "Открыть ABT"
         self.admin_save_caption = "Сохранить ABT"
@@ -373,7 +374,7 @@ class WindowsConfig(tk.Tk):
                              fg="white" if selected else "#161616",
                              activebackground="#a81629" if selected else "#e8e8ec")
         info = self.admin_module_info.get(module, {})
-        self.module_label.configure(text=f"{module}: {info.get('name') or module}")
+        self.module_label.configure(text=f"{module}: {info.get('name') or MODULE_NAMES[module]}")
         prefix = MODULES[module]
         self.module_details.configure(text=f"ID: {prefix or '—'}  |  Ver: {info.get('version') or ('ABT загружен' if self.raw_file else 'Образец')}")
         self.table.delete(*self.table.get_children())
@@ -523,7 +524,7 @@ class WindowsConfig(tk.Tk):
                 item = saved_info.get(module)
                 if isinstance(item, dict):
                     self.admin_module_info[module] = {
-                        "name": str(item.get("name", module))[:70],
+                        "name": (MODULE_NAMES[module] if str(item.get("name", "")).strip() in ("", module) else str(item["name"]))[:70],
                         "version": str(item.get("version", ""))[:40],
                     }
         self.admin_extra_rows = extra
@@ -1182,52 +1183,84 @@ class WindowsConfig(tk.Tk):
     def show_faq(self):
         dialog = tk.Toplevel(self)
         dialog.title("FAQ — M6GH AS-Built Config")
-        self.center_dialog(dialog, 480, 360)
-        dialog.resizable(False, False)
-        frame = tk.Frame(dialog, bg="#f4f4f6", padx=8, pady=8)
-        frame.pack(fill="both", expand=True)
+        self.center_dialog(dialog, 570, 400)
+        dialog.minsize(450, 300)
+        dialog.configure(bg="#f4f4f6")
+        shell = tk.Frame(dialog, bg="#f4f4f6", padx=8, pady=8)
+        shell.pack(fill="both", expand=True)
+        sidebar = tk.Frame(shell, bg="#f4f4f6", highlightbackground="#c81930",
+                           highlightthickness=1, width=80)
+        sidebar.pack(side="left", fill="y", padx=(0, 7))
+        sidebar.pack_propagate(False)
+        area = tk.Frame(shell, bg="#f4f4f6")
+        area.pack(side="left", fill="both", expand=True)
+        canvas = tk.Canvas(area, bg="#f4f4f6", highlightthickness=0, bd=0)
+        scroll = ttk.Scrollbar(area, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scroll.set)
+        scroll.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        content = tk.Frame(canvas, bg="#f4f4f6")
+        window_id = canvas.create_window((0, 0), window=content, anchor="nw")
+        content.bind("<Configure>", lambda event: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda event: canvas.itemconfigure(window_id, width=event.width))
         active = [self.active_module if self.active_module in MODULES else "IC"]
-        tabs = tk.Frame(frame, bg="#f4f4f6")
-        tabs.pack(fill="x", pady=(0, 5))
         buttons = {}
-        body = tk.Frame(frame, bg="#f4f4f6")
-        body.pack(fill="both", expand=True)
-        view = tk.Text(body, wrap="word", font=("Segoe UI", 9), bg="#f4f4f6",
-                       relief="flat", padx=4, pady=3)
-        view.pack(side="left", fill="both", expand=True)
-        bar = ttk.Scrollbar(body, orient="vertical", command=view.yview)
-        bar.pack(side="right", fill="y")
-        view.configure(yscrollcommand=bar.set)
-        view.tag_configure("heading", foreground="#b61d31",
-                           font=("Segoe UI", 9, "bold"))
         def show_module(module):
             active[0] = module
             for name, button in buttons.items():
                 selected = name == module
                 button.configure(bg="#c81930" if selected else "#c5c5cb",
                                  fg="white" if selected else "#161616")
-            view.configure(state="normal")
-            view.delete("1.0", "end")
+            for child in content.winfo_children():
+                child.destroy()
             count = 0
             for item in self.faq_entries:
                 if not isinstance(item, dict) or item.get("module", "IC") != module:
                     continue
                 count += 1
-                view.insert("end", str(item.get("name", "")) + "\n", "heading")
-                view.insert("end", str(item.get("description", "")) + "\n")
+                card = tk.Frame(content, bg="#ffffff", highlightbackground="#c81930",
+                                highlightthickness=1, padx=8, pady=7)
+                card.pack(fill="x", padx=3, pady=(2, 7))
+                tk.Label(card, text=str(item.get("name", "")), font=("Segoe UI", 9, "bold"),
+                         fg="#b61d31", bg="#ffffff", anchor="w", justify="left",
+                         wraplength=355).pack(fill="x")
+                tk.Frame(card, bg="#c81930", height=1).pack(fill="x", pady=(4, 5))
+                description = str(item.get("description", ""))
                 if item.get("extra_text"):
-                    view.insert("end", str(item["extra_text"]) + "\n")
-                view.insert("end", "─" * 30 + "\n\n")
+                    description += "\n" + str(item["extra_text"])
+                tk.Label(card, text=description, font=("Segoe UI", 9),
+                         bg="#ffffff", fg="#252525", anchor="nw", justify="left",
+                         wraplength=355).pack(fill="x")
             if not count:
-                view.insert("end", "Для блока " + module + " пока нет записей FAQ.")
-            view.configure(state="disabled")
+                tk.Label(content, text="Для блока " + module + " пока нет записей FAQ.",
+                         bg="#f4f4f6", font=("Segoe UI", 9), anchor="w").pack(padx=8, pady=12)
+            canvas.yview_moveto(0)
         for module in MODULES:
-            button = tk.Button(tabs, text=module, font=("Segoe UI", 9, "bold"),
-                               relief="raised", bd=1, padx=3, pady=3,
+            button = tk.Button(sidebar, text=module, font=("Segoe UI", 9, "bold"),
+                               relief="raised", bd=1, padx=4, pady=7,
                                command=lambda m=module: show_module(m))
-            button.pack(side="left", fill="x", expand=True, padx=2)
+            button.pack(fill="x", padx=5, pady=4)
             buttons[module] = button
-        show_module(active[0])
+        def wheel(event):
+            if getattr(event, "delta", 0):
+                canvas.yview_scroll(-int(event.delta / 120), "units")
+            elif getattr(event, "num", 0) == 4:
+                canvas.yview_scroll(-1, "units")
+            elif getattr(event, "num", 0) == 5:
+                canvas.yview_scroll(1, "units")
+        def bind_wheel(widget):
+            widget.bind("<MouseWheel>", wheel)
+            widget.bind("<Button-4>", wheel)
+            widget.bind("<Button-5>", wheel)
+            for child in widget.winfo_children():
+                bind_wheel(child)
+        original_show = show_module
+        def display(module):
+            original_show(module)
+            bind_wheel(content)
+        for module, button in buttons.items():
+            button.configure(command=lambda m=module: display(m))
+        display(active[0])
 
     def center_dialog(self, dialog, width, height, make_transient=True):
         self.update_idletasks()
@@ -1253,23 +1286,24 @@ class WindowsConfig(tk.Tk):
         tk.Label(dialog, text="M6GH AS-BUILT CONFIG", font=("Segoe UI", 17, "bold"),
                  bg="#f4f4f6").pack(pady=(0, 10))
         tk.Frame(dialog, bg="#c81930", height=4).pack(fill="x", padx=36, pady=(0, 12))
-        body = tk.Frame(dialog, bg="#f4f4f6")
-        body.pack(fill="both", expand=True, padx=30)
-        text = tk.Text(body, wrap="word", font=("Segoe UI", 11), bg="#f4f4f6",
-                       relief="flat", padx=8, pady=4)
+        main = tk.Frame(dialog, bg="#f4f4f6", padx=25)
+        main.pack(fill="both", expand=True)
+        description_border = tk.Frame(main, bg="#ffffff", highlightbackground="#c81930",
+                                      highlightthickness=1)
+        description_border.pack(fill="both", expand=True, pady=(0, 12))
+        text = tk.Text(description_border, wrap="word", font=("Segoe UI", 10),
+                       bg="#ffffff", relief="flat", padx=9, pady=8, height=11)
         text.pack(side="left", fill="both", expand=True)
-        bar = ttk.Scrollbar(body, command=text.yview)
-        bar.pack(side="right", fill="y")
-        text.configure(yscrollcommand=bar.set)
-        text.tag_configure("warning", foreground="#b61d31", font=("Segoe UI", 11, "bold"), justify="center")
-        for name, options in {
-            "bold": {"font": ("Segoe UI", 11, "bold")},
-            "italic": {"font": ("Segoe UI", 11, "italic")},
+        scrollbar = ttk.Scrollbar(description_border, command=text.yview)
+        scrollbar.pack(side="right", fill="y")
+        text.configure(yscrollcommand=scrollbar.set)
+        for tag, options in {
+            "bold": {"font": ("Segoe UI", 10, "bold")},
+            "italic": {"font": ("Segoe UI", 10, "italic")},
             "underline": {"underline": True},
             "strike": {"overstrike": True},
         }.items():
-            text.tag_configure(name, **options)
-
+            text.tag_configure(tag, **options)
         class Markup(HTMLParser):
             tags = {"b": "bold", "strong": "bold", "u": "underline",
                     "s": "strike", "strike": "strike", "del": "strike",
@@ -1288,32 +1322,34 @@ class WindowsConfig(tk.Tk):
                     self.active.remove(value)
             def handle_data(self, data):
                 text.insert("end", data, tuple(self.active))
-
         markup = Markup()
         markup.feed(self.admin_about_description)
         markup.close()
-        text.insert("end", "\n\n\n\n")
-        text.insert("end", self.admin_warning_title + "\n" + self.admin_warning_text + "\n\n\n\n\n", "warning")
-        for number, (role, name, link) in enumerate(self.admin_authors):
-            text.insert("end", role + ": ")
-            icon = tk.Canvas(text, width=18, height=18, bg="#f4f4f6", highlightthickness=0, bd=0)
-            icon.create_rectangle(0, 0, 18, 18, fill="#d50032", outline="#d50032")
-            icon.create_text(9, 9, text="D", fill="white", font=("Arial", 12, "bold"))
-            text.window_create("end", window=icon, padx=3, pady=0)
-            text.insert("end", " ")
-            if link and link.startswith(("https://", "http://")):
-                tag = "author_link_" + str(number)
-                text.tag_configure(tag, foreground="#1264a3", underline=True)
-                text.tag_bind(tag, "<Button-1>", lambda event, url=link: webbrowser.open(url))
-                text.tag_bind(tag, "<Enter>", lambda event: text.configure(cursor="hand2"))
-                text.tag_bind(tag, "<Leave>", lambda event: text.configure(cursor="arrow"))
-                text.insert("end", name, (tag,))
-            else:
-                text.insert("end", name)
-            text.insert("end", "\n")
         text.configure(state="disabled")
+        warning = tk.Frame(main, bg="#ffffff", highlightbackground="#c81930",
+                           highlightthickness=1, padx=8, pady=9)
+        warning.pack(fill="x", pady=(0, 12))
+        tk.Label(warning, text=self.admin_warning_title, font=("Segoe UI", 11, "bold"),
+                 bg="#ffffff", fg="#b61d31").pack(fill="x")
+        tk.Label(warning, text=self.admin_warning_text, font=("Segoe UI", 10, "bold"),
+                 bg="#ffffff", fg="#b61d31", wraplength=520,
+                 justify="center").pack(fill="x", pady=(3, 0))
+        authors = tk.Frame(main, bg="#f4f4f6")
+        authors.pack(fill="x", pady=(0, 5))
+        for role, name, link in self.admin_authors:
+            line = tk.Frame(authors, bg="#f4f4f6")
+            line.pack(fill="x", pady=1)
+            tk.Label(line, text=role + ": ", bg="#f4f4f6", font=("Segoe UI", 9)).pack(side="left")
+            tk.Label(line, text="D", bg="#d50032", fg="white",
+                     font=("Arial", 9, "bold"), padx=3).pack(side="left", padx=(0, 5))
+            author = tk.Label(line, text=name, bg="#f4f4f6", fg="#1264a3",
+                              cursor="hand2" if link.startswith(("https://", "http://")) else "arrow",
+                              font=("Segoe UI", 9, "underline"))
+            author.pack(side="left")
+            if link.startswith(("https://", "http://")):
+                author.bind("<Button-1>", lambda event, url=link: webbrowser.open(url))
         tk.Button(dialog, text="Закрыть", command=dialog.destroy, bg="#c81930", fg="white",
-                  font=("Segoe UI", 12, "bold"), pady=10).pack(fill="x", padx=36, pady=16)
+                  font=("Segoe UI", 10, "bold"), pady=6).pack(fill="x", padx=36, pady=10)
 
     def open_features(self):
         name = filedialog.askopenfilename(title="Локальные функции (без Supabase)",
