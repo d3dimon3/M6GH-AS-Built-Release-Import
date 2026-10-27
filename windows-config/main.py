@@ -602,6 +602,22 @@ class WindowsConfig(tk.Tk):
         self.center_dialog(dialog, width, height)
         dialog.resizable(True, True)
         dialog.minsize(min(460, width), min(390, height))
+        # Tk's default Ctrl+C/V/X bindings can fail with a Russian keyboard
+        # layout (the physical V/C/X keys produce Cyrillic keysyms).
+        # Handle their Windows virtual-key codes for every admin text field.
+        def admin_clipboard_shortcuts(event):
+            if not (event.state & 0x4):
+                return
+            widget = event.widget
+            if not isinstance(widget, (tk.Entry, ttk.Entry, ttk.Combobox, tk.Text)):
+                return
+            if event.keysym.lower() in ("c", "v", "x"):
+                return  # Native Tk class binding already handled Latin layout.
+            shortcut = {0x43: "<<Copy>>", 0x56: "<<Paste>>", 0x58: "<<Cut>>"}.get(event.keycode)
+            if shortcut:
+                widget.event_generate(shortcut)
+                return "break"
+        dialog.bind("<Control-KeyPress>", admin_clipboard_shortcuts)
         tabs = ttk.Notebook(dialog)
         tabs.pack(fill="both", expand=True, padx=6, pady=5)
         pages = {}
