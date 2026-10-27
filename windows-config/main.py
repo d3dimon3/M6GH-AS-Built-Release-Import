@@ -1526,6 +1526,11 @@ class WindowsConfig(tk.Tk):
             highlights = active_hex_positions(siblings, feature.address, new_value)
             self.table.highlights[feature.address] = highlights
             self.table.update_value(feature.address, new_value, highlights)
+            # Update checkbox states in place (no widget rebuild or flicker).
+            visible = [f for f in self.features if f.module == self.active_module]
+            for sibling, sibling_var in zip(visible, self.feature_vars):
+                if sibling.address == feature.address:
+                    sibling_var.set(self.engine.state(sibling, new_value))
             self.status.configure(text=f"Предпросмотр: {feature.label or feature.id} — {'ON' if var.get() else 'OFF'}. Файл не изменён.")
         except (ValueError, IndexError) as exc:
             var.set(not var.get())
