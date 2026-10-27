@@ -180,19 +180,19 @@
   ],
   "module_info": {
     "IC": {
-      "name": "IC",
+      "name": "Instrument Cluster",
       "version": ""
     },
     "BCM": {
-      "name": "BCM",
+      "name": "Body Control Module",
       "version": ""
     },
     "RKE": {
-      "name": "RKE",
+      "name": "Remote Keyless Entry",
       "version": ""
     },
     "ABS": {
-      "name": "ABS",
+      "name": "Anti-lock Brake System",
       "version": ""
     },
     "AFS": {
