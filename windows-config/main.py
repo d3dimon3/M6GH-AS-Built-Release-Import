@@ -1291,11 +1291,8 @@ class WindowsConfig(tk.Tk):
         def draw_title(event=None):
             w = max(10, title_box.winfo_width())
             title_box.delete("all")
-            r = 2
-            title_box.create_polygon(r, 1, w-r, 1, w-1, r, w-1, 36-r,
-                                     w-r, 36, r, 36, 1, 36-r, 1, r,
-                                     smooth=True, splinesteps=12,
-                                     fill="#dedee3", outline="#bfc0c8", width=1)
+            title_box.create_rectangle(1, 1, w-2, 35,
+                                       fill="#dedee3", outline="#bfc0c8", width=1)
             title_box.create_text(w//2, 18, text="О программе",
                                   font=("Segoe UI", 13, "bold"), fill="#222222")
         title_box.bind("<Configure>", draw_title)
@@ -1308,7 +1305,7 @@ class WindowsConfig(tk.Tk):
         description_border.pack(fill="x", pady=(0, 9))
         text = tk.Text(description_border, wrap="word", font=("Segoe UI", 9),
                        bg=panel_bg, relief="flat", padx=0, pady=0,
-                       borderwidth=0, highlightthickness=0, width=72, height=14)
+                       borderwidth=0, highlightthickness=0, width=72, height=10)
         text.pack(fill="x")
         for tag, options in {
             "bold": {"font": ("Segoe UI", 9, "bold")},
@@ -1351,7 +1348,7 @@ class WindowsConfig(tk.Tk):
                  justify="center").pack(fill="x", pady=(2, 0))
 
         authors = tk.Frame(outer, bg="#f4f4f6")
-        authors.pack(fill="x", pady=(0, 5))
+        authors.pack(fill="x", pady=(10, 8))
         for role, name, link in self.admin_authors:
             line = tk.Frame(authors, bg="#f4f4f6")
             line.pack(fill="x", pady=1)
@@ -1366,40 +1363,25 @@ class WindowsConfig(tk.Tk):
             author.pack(side="left")
             if valid_link:
                 author.bind("<Button-1>", lambda event, url=link: webbrowser.open(url))
-        tk.Button(outer, text="Закрыть", command=dialog.destroy,
-                  bg=border, fg="white", font=("Segoe UI", 9, "bold"),
-                  pady=5).pack(fill="x", pady=(5, 0))
 
-        # Fixed, readable width; compute required text height only after Tk has
-        # laid out the widget. Avoid displaylines count on an unmapped 1px widget.
+        # Tk Text.count('displaylines') after layout measures actual wrapped lines,
+        # including explicit newlines and rich-text formatting. Never estimate
+        # based on raw word widths: that clipped the final FORScan paragraph.
         def fit_dialog():
             if not dialog.winfo_exists():
                 return
             dialog.update_idletasks()
-            from tkinter import font as tkfont
-            measure_font = tkfont.Font(family="Segoe UI", size=9)
-            available = max(300, text.winfo_width() - 4)
-            lines = 0
-            for paragraph in text.get("1.0", "end-1c").split("\\n"):
-                if not paragraph:
-                    lines += 1
-                    continue
-                current = ""
-                for word in paragraph.split(" "):
-                    trial = word if not current else current + " " + word
-                    if current and measure_font.measure(trial) > available:
-                        lines += 1
-                        current = word
-                    else:
-                        current = trial
-                lines += max(1, (measure_font.measure(current) + available - 1) // available)
-            text.configure(height=max(3, lines + 1))
+            try:
+                displayed = int(text.count("1.0", "end-1c", "displaylines")[0])
+            except (tk.TclError, ValueError, TypeError):
+                displayed = int(text.index("end-1c").split(".")[0])
+            text.configure(height=max(5, displayed + 2))
             dialog.update_idletasks()
-            width = min(630, max(540, dialog.winfo_reqwidth()))
-            height = dialog.winfo_reqheight()
+            width = max(640, dialog.winfo_reqwidth())
+            height = dialog.winfo_reqheight() + 12
             self.center_dialog(dialog, width, height)
-        self.center_dialog(dialog, 610, 480)
-        dialog.after(100, fit_dialog)
+        self.center_dialog(dialog, 680, 550)
+        dialog.after(120, fit_dialog)
 
     def open_features(self):
         name = filedialog.askopenfilename(title="Локальные функции (без Supabase)",
