@@ -119,6 +119,7 @@ class HexTable(tk.Frame):
         self.highlights = {}
         self.items = []
         self.row_widgets = []
+        self.value_widgets = {}
         header = tk.Frame(self, bg="#dedee3")
         header.pack(fill="x")
         for title, width in (("Адрес строки", 16), ("Значение HEX", 30)):
@@ -159,6 +160,7 @@ class HexTable(tk.Frame):
             child.destroy()
         self.items.clear()
         self.row_widgets.clear()
+        self.value_widgets.clear()
 
     def insert(self, parent, position, values, tags=()):
         address, value = values
@@ -178,6 +180,7 @@ class HexTable(tk.Frame):
                        bd=0, padx=5, pady=3, highlightthickness=0,
                        wrap="none", cursor="arrow")
         text.pack(fill="x")
+        self.value_widgets[address] = text
         text.insert("1.0", value)
         text.tag_configure("active", foreground="#c81930",
                            font=("Consolas", 10, "bold"))
@@ -190,6 +193,23 @@ class HexTable(tk.Frame):
         text.configure(state="disabled")
         self.after_idle(self.fit_rows)
         return len(self.items) - 1
+
+    def update_value(self, address, value, highlights):
+        """Update only one existing HEX cell; never recreate the table."""
+        widget = self.value_widgets.get(address)
+        if widget is None:
+            return
+        widget.configure(state="normal")
+        widget.delete("1.0", "end")
+        widget.insert("1.0", value)
+        widget.tag_remove("active", "1.0", "end")
+        raw_index = 0
+        for column, char in enumerate(value):
+            if char != " ":
+                if raw_index in highlights:
+                    widget.tag_add("active", f"1.{column}", f"1.{column + 1}")
+                raw_index += 1
+        widget.configure(state="disabled")
 
 
 def active_hex_positions(features, address, value):
@@ -1487,7 +1507,9 @@ class WindowsConfig(tk.Tk):
             if not checksum_valid(feature.address, new_value):
                 raise ValueError("Контрольная сумма не прошла проверку")
             self.preview_rows[feature.address] = new_value
-            self.select_module(self.active_module)
+            highlights = active_hex_positions(siblings, feature.address, new_value)
+            self.table.highlights[feature.address] = highlights
+            self.table.update_value(feature.address, new_value, highlights)
             self.status.configure(text=f"Предпросмотр: {feature.label or feature.id} — {'ON' if var.get() else 'OFF'}. Файл не изменён.")
         except (ValueError, IndexError) as exc:
             var.set(not var.get())
