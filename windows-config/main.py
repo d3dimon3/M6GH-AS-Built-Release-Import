@@ -118,14 +118,29 @@ class HexTable(tk.Frame):
         super().__init__(parent, bg="#c4c4cb", bd=1, relief="solid")
         self.highlights = {}
         self.items = []
+        self.row_widgets = []
         header = tk.Frame(self, bg="#dedee3")
         header.pack(fill="x")
         for title, width in (("Адрес строки", 16), ("Значение HEX", 30)):
             tk.Label(header, text=title, width=width, bg="#dedee3",
-                     font=("Segoe UI", 9, "bold"), anchor="center").pack(
+                     font=("Segoe UI", 10, "bold"), anchor="center").pack(
                          side="left", fill="x", expand=True, pady=3)
         self.body = tk.Frame(self, bg="#c4c4cb")
         self.body.pack(fill="both", expand=True)
+
+    def fit_rows(self):
+        """Keep all HEX rows visible by reducing padding for large modules."""
+        count = len(self.row_widgets)
+        available = self.body.winfo_height()
+        if available <= 1 or not count:
+            return
+        # Each row needs roughly 23 px at 10 pt; add padding only when it fits.
+        pad = 3 if count * 31 <= available else (1 if count * 27 <= available else 0)
+        for row in self.row_widgets:
+            for cell in row.winfo_children():
+                for widget in cell.winfo_children():
+                    if isinstance(widget, (tk.Label, tk.Text)):
+                        widget.configure(pady=pad)
 
     def heading(self, *args, **kwargs):
         pass
@@ -143,27 +158,29 @@ class HexTable(tk.Frame):
         for child in self.body.winfo_children():
             child.destroy()
         self.items.clear()
+        self.row_widgets.clear()
 
     def insert(self, parent, position, values, tags=()):
         address, value = values
         self.items.append(values)
         row = tk.Frame(self.body, bg="#c4c4cb")
         row.pack(fill="x", pady=(0, 1))
+        self.row_widgets.append(row)
         address_cell = tk.Frame(row, bg="#f0f0f2", bd=1, relief="solid")
         address_cell.pack(side="left", fill="both", expand=True, padx=(0, 1))
         tk.Label(address_cell, text=address, width=16, bg="#f0f0f2",
-                 fg="#222222", font=("Consolas", 9, "bold"),
-                 anchor="center", pady=0).pack(fill="x")
+                 fg="#222222", font=("Consolas", 10, "bold"),
+                 anchor="center", pady=3).pack(fill="x")
         value_cell = tk.Frame(row, bg="#f0f0f2", bd=1, relief="solid")
         value_cell.pack(side="left", fill="both", expand=True)
         text = tk.Text(value_cell, height=1, width=30, bg="#f0f0f2",
-                       fg="#3b3b3b", font=("Consolas", 9), relief="flat",
-                       bd=0, padx=5, pady=0, highlightthickness=0,
+                       fg="#3b3b3b", font=("Consolas", 10), relief="flat",
+                       bd=0, padx=5, pady=3, highlightthickness=0,
                        wrap="none", cursor="arrow")
         text.pack(fill="x")
         text.insert("1.0", value)
         text.tag_configure("active", foreground="#c81930",
-                           font=("Consolas", 9, "bold"))
+                           font=("Consolas", 10, "bold"))
         raw_index = 0
         for column, char in enumerate(value):
             if char != " ":
@@ -171,6 +188,7 @@ class HexTable(tk.Frame):
                     text.tag_add("active", f"1.{column}", f"1.{column + 1}")
                 raw_index += 1
         text.configure(state="disabled")
+        self.after_idle(self.fit_rows)
         return len(self.items) - 1
 
 
