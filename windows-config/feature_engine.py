@@ -119,6 +119,20 @@ class FeatureEngine:
                     raise ValueError("HEX index out of range")
                 raw[p] = digit
 
+    @staticmethod
+    def conflicts(first: Feature, second: Feature) -> bool:
+        """True only for competing values at the same HEX position.
+
+        Independent functions sharing an AS-Built row remain independent.
+        """
+        if first.id == second.id or first.module != second.module or first.address != second.address:
+            return False
+        if first.mode.upper() != "HEX" or second.mode.upper() != "HEX":
+            return False
+        a = dict(zip(indices(first.indices), norm(first.on)))
+        b = dict(zip(indices(second.indices), norm(second.on)))
+        return any(position in b and digit != b[position] for position, digit in a.items())
+
     def apply(self, module: str, address: str, value: str,
               changed: Feature, active: bool, features: list[Feature]) -> str:
         if changed.module != module or changed.address != address:
@@ -129,6 +143,12 @@ class FeatureEngine:
         enabled = set(self.enabled)
         disabled = set(self.explicitly_disabled)
         if active:
+            # Selecting one HEX value deselects incompatible alternatives.
+            # Never apply their OFF values: those could overwrite the chosen ON.
+            for other in features:
+                if self.conflicts(changed, other):
+                    enabled.discard(self.key(other))
+                    disabled.discard(self.key(other))
             enabled.add(key)
             disabled.discard(key)
         else:
