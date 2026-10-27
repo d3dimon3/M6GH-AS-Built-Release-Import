@@ -1291,7 +1291,7 @@ class WindowsConfig(tk.Tk):
         def draw_title(event=None):
             w = max(10, title_box.winfo_width())
             title_box.delete("all")
-            r = 8
+            r = 2
             title_box.create_polygon(r, 1, w-r, 1, w-1, r, w-1, 36-r,
                                      w-r, 36, r, 36, 1, 36-r, 1, r,
                                      smooth=True, splinesteps=12,
@@ -1308,7 +1308,7 @@ class WindowsConfig(tk.Tk):
         description_border.pack(fill="x", pady=(0, 9))
         text = tk.Text(description_border, wrap="word", font=("Segoe UI", 9),
                        bg=panel_bg, relief="flat", padx=0, pady=0,
-                       borderwidth=0, highlightthickness=0, width=65, height=1)
+                       borderwidth=0, highlightthickness=0, width=72, height=14)
         text.pack(fill="x")
         for tag, options in {
             "bold": {"font": ("Segoe UI", 9, "bold")},
@@ -1370,21 +1370,36 @@ class WindowsConfig(tk.Tk):
                   bg=border, fg="white", font=("Segoe UI", 9, "bold"),
                   pady=5).pack(fill="x", pady=(5, 0))
 
-        # Grow the text and dialog to fit the configured description; no scrollbars.
-        # Cap the initial width to remain usable on low-resolution x86 tablets.
+        # Fixed, readable width; compute required text height only after Tk has
+        # laid out the widget. Avoid displaylines count on an unmapped 1px widget.
         def fit_dialog():
             if not dialog.winfo_exists():
                 return
-            text.configure(state="normal")
-            text.update_idletasks()
-            display_lines = text.count("1.0", "end-1c", "displaylines")
-            lines = max(1, int(display_lines[0]) if display_lines else 1)
-            text.configure(height=lines + 1, state="disabled")
             dialog.update_idletasks()
-            width = min(540, max(430, dialog.winfo_reqwidth()))
+            from tkinter import font as tkfont
+            measure_font = tkfont.Font(family="Segoe UI", size=9)
+            available = max(300, text.winfo_width() - 4)
+            lines = 0
+            for paragraph in text.get("1.0", "end-1c").split("\\n"):
+                if not paragraph:
+                    lines += 1
+                    continue
+                current = ""
+                for word in paragraph.split(" "):
+                    trial = word if not current else current + " " + word
+                    if current and measure_font.measure(trial) > available:
+                        lines += 1
+                        current = word
+                    else:
+                        current = trial
+                lines += max(1, (measure_font.measure(current) + available - 1) // available)
+            text.configure(height=max(3, lines + 1))
+            dialog.update_idletasks()
+            width = min(630, max(540, dialog.winfo_reqwidth()))
             height = dialog.winfo_reqheight()
             self.center_dialog(dialog, width, height)
-        dialog.after_idle(fit_dialog)
+        self.center_dialog(dialog, 610, 480)
+        dialog.after(100, fit_dialog)
 
     def open_features(self):
         name = filedialog.askopenfilename(title="Локальные функции (без Supabase)",
