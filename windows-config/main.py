@@ -931,6 +931,10 @@ class WindowsConfig(tk.Tk):
                  font=("Segoe UI", 9)).pack()
         faq_description = tk.Text(faq_page, height=5, font=("Segoe UI", 9), wrap="word")
         faq_description.pack(fill="both", expand=True, padx=12, pady=(0, 3))
+        tk.Label(faq_page, text="Дополнительная надпись (красным, необязательно)",
+                 bg="#f4f4f6", font=("Segoe UI", 9)).pack()
+        faq_extra = tk.Entry(faq_page, font=("Segoe UI", 9))
+        faq_extra.pack(fill="x", padx=12, pady=(0, 5))
         def refresh_faq():
             faq_list.delete(0, "end")
             faq_index.clear()
@@ -946,6 +950,7 @@ class WindowsConfig(tk.Tk):
             faq_list.selection_clear(0, "end")
             faq_name.delete(0, "end")
             faq_description.delete("1.0", "end")
+            faq_extra.delete(0, "end")
         def switch_faq_module(module):
             faq_active[0] = module
             new_faq()
@@ -965,6 +970,8 @@ class WindowsConfig(tk.Tk):
             faq_name.insert(0, str(item.get("name", "")))
             faq_description.delete("1.0", "end")
             faq_description.insert("1.0", str(item.get("description", "")))
+            faq_extra.delete(0, "end")
+            faq_extra.insert(0, str(item.get("extra_text", "")))
         faq_list.bind("<<ListboxSelect>>", select_faq)
         def save_faq():
             name = faq_name.get().strip()
@@ -975,7 +982,8 @@ class WindowsConfig(tk.Tk):
             selected = faq_list.curselection()
             old = self.faq_entries[faq_index[selected[0]]] if selected and selected[0] < len(faq_index) else {}
             item = dict(old) if isinstance(old, dict) else {}
-            item.update({"name": name, "description": description, "module": faq_active[0]})
+            item.update({"name": name, "description": description,
+                         "extra_text": faq_extra.get().strip(), "module": faq_active[0]})
             if selected and selected[0] < len(faq_index):
                 self.faq_entries[faq_index[selected[0]]] = item
             else:
@@ -1226,11 +1234,14 @@ class WindowsConfig(tk.Tk):
                          wraplength=355).pack(fill="x")
                 tk.Frame(card, bg="#c81930", height=1).pack(fill="x", pady=(4, 5))
                 description = str(item.get("description", ""))
-                if item.get("extra_text"):
-                    description += "\n" + str(item["extra_text"])
                 tk.Label(card, text=description, font=("Segoe UI", 9),
                          bg="#ffffff", fg="#252525", anchor="nw", justify="left",
                          wraplength=355).pack(fill="x")
+                extra = str(item.get("extra_text", "")).strip()
+                if extra:
+                    tk.Label(card, text=extra, font=("Segoe UI", 9),
+                             bg="#ffffff", fg="#c81930", anchor="nw", justify="left",
+                             wraplength=355).pack(fill="x", pady=(3, 0))
             if not count:
                 tk.Label(content, text="Для блока " + module + " пока нет записей FAQ.",
                          bg="#f4f4f6", font=("Segoe UI", 9), anchor="w").pack(padx=8, pady=12)
