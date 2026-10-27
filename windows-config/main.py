@@ -913,27 +913,53 @@ class WindowsConfig(tk.Tk):
         tk.Button(about_content, text="Сохранить описание и авторов", command=save_about).pack(pady=12)
 
         faq_page = pages["FAQ"]
-        tk.Label(faq_page, text="Редактор FAQ (локально)", font=("Segoe UI", 14, "bold"),
-                 bg="#f4f4f6").pack(pady=8)
-        faq_list = tk.Listbox(faq_page, height=8)
-        faq_list.pack(fill="x", padx=18)
-        tk.Label(faq_page, text="Заголовок", bg="#f4f4f6").pack()
-        faq_name = tk.Entry(faq_page, width=75)
-        faq_name.pack()
-        tk.Label(faq_page, text="Описание", bg="#f4f4f6").pack()
-        faq_description = tk.Text(faq_page, height=6, width=75)
-        faq_description.pack()
+        tk.Label(faq_page, text="FAQ по блокам", font=("Segoe UI", 10, "bold"),
+                 bg="#f4f4f6").pack(pady=(5, 3))
+        faq_active = [next(iter(MODULES))]
+        faq_index = []
+        faq_buttons_bar = tk.Frame(faq_page, bg="#f4f4f6")
+        faq_buttons_bar.pack(fill="x", padx=8, pady=(0, 4))
+        faq_tab_buttons = {}
+        faq_list = tk.Listbox(faq_page, height=6, font=("Segoe UI", 9))
+        faq_list.pack(fill="x", padx=10)
+        tk.Label(faq_page, text="Заголовок", bg="#f4f4f6",
+                 font=("Segoe UI", 9)).pack()
+        faq_name = tk.Entry(faq_page, font=("Segoe UI", 9))
+        faq_name.pack(fill="x", padx=12)
+        tk.Label(faq_page, text="Описание", bg="#f4f4f6",
+                 font=("Segoe UI", 9)).pack()
+        faq_description = tk.Text(faq_page, height=5, font=("Segoe UI", 9), wrap="word")
+        faq_description.pack(fill="both", expand=True, padx=12, pady=(0, 3))
         def refresh_faq():
             faq_list.delete(0, "end")
-            for item in self.faq_entries:
-                faq_list.insert("end", str(item.get("name", "")) if isinstance(item, dict) else "")
+            faq_index.clear()
+            for index, item in enumerate(self.faq_entries):
+                if isinstance(item, dict) and item.get("module", "IC") == faq_active[0]:
+                    faq_index.append(index)
+                    faq_list.insert("end", str(item.get("name", "")))
+            for module, button in faq_tab_buttons.items():
+                active = module == faq_active[0]
+                button.configure(bg="#c81930" if active else "#c5c5cb",
+                                 fg="white" if active else "#161616")
+        def new_faq():
+            faq_list.selection_clear(0, "end")
+            faq_name.delete(0, "end")
+            faq_description.delete("1.0", "end")
+        def switch_faq_module(module):
+            faq_active[0] = module
+            new_faq()
+            refresh_faq()
+        for module in MODULES:
+            button = tk.Button(faq_buttons_bar, text=module, font=("Segoe UI", 9, "bold"),
+                               command=lambda m=module: switch_faq_module(m),
+                               relief="raised", bd=1, padx=5, pady=3)
+            button.pack(side="left", fill="x", expand=True, padx=2)
+            faq_tab_buttons[module] = button
         def select_faq(event=None):
             selected = faq_list.curselection()
-            if not selected:
+            if not selected or selected[0] >= len(faq_index):
                 return
-            item = self.faq_entries[selected[0]]
-            if not isinstance(item, dict):
-                return
+            item = self.faq_entries[faq_index[selected[0]]]
             faq_name.delete(0, "end")
             faq_name.insert(0, str(item.get("name", "")))
             faq_description.delete("1.0", "end")
@@ -946,29 +972,31 @@ class WindowsConfig(tk.Tk):
                 messagebox.showerror("FAQ", "Введите заголовок.", parent=dialog)
                 return
             selected = faq_list.curselection()
-            item = {"name": name, "description": description}
-            if selected:
-                self.faq_entries[selected[0]] = item
+            old = self.faq_entries[faq_index[selected[0]]] if selected and selected[0] < len(faq_index) else {}
+            item = dict(old) if isinstance(old, dict) else {}
+            item.update({"name": name, "description": description, "module": faq_active[0]})
+            if selected and selected[0] < len(faq_index):
+                self.faq_entries[faq_index[selected[0]]] = item
             else:
                 self.faq_entries.append(item)
+            self.save_admin_draft_file()
             refresh_faq()
-        def new_faq():
-            faq_list.selection_clear(0, "end")
-            faq_name.delete(0, "end")
-            faq_description.delete("1.0", "end")
         def delete_faq():
             selected = faq_list.curselection()
-            if selected and messagebox.askyesno("FAQ", "Удалить выбранную запись?", parent=dialog):
-                self.faq_entries.pop(selected[0])
+            if selected and selected[0] < len(faq_index) and messagebox.askyesno(
+                    "FAQ", "Удалить выбранную запись?", parent=dialog):
+                self.faq_entries.pop(faq_index[selected[0]])
+                self.save_admin_draft_file()
                 new_faq()
                 refresh_faq()
-        faq_buttons = tk.Frame(faq_page, bg="#f4f4f6")
-        faq_buttons.pack(pady=8)
+        faq_controls = tk.Frame(faq_page, bg="#f4f4f6")
+        faq_controls.pack(pady=4)
         for caption, action in (("Новая", new_faq), ("Сохранить", save_faq),
                                 ("Удалить", delete_faq), ("Просмотр FAQ", self.show_faq)):
-            tk.Button(faq_buttons, text=caption, command=action).pack(side="left", padx=5)
-        tk.Label(faq_page, text="Изменения видны в FAQ до перезапуска; публикации на сервер нет.",
-                 bg="#f4f4f6").pack()
+            tk.Button(faq_controls, text=caption, font=("Segoe UI", 9),
+                      command=action).pack(side="left", padx=3)
+        tk.Label(faq_page, text="FAQ сохраняется локально. Новые записи относятся к выбранному блоку.",
+                 font=("Segoe UI", 8), bg="#f4f4f6").pack()
         refresh_faq()
         def save_admin_draft():
             path = filedialog.asksaveasfilename(parent=dialog, title="Сохранить настройки админки",
@@ -1154,27 +1182,52 @@ class WindowsConfig(tk.Tk):
     def show_faq(self):
         dialog = tk.Toplevel(self)
         dialog.title("FAQ — M6GH AS-Built Config")
-        self.center_dialog(dialog, 700, 540)
+        self.center_dialog(dialog, 480, 360)
         dialog.resizable(False, False)
-        frame = tk.Frame(dialog, bg="#f4f4f6", padx=16, pady=16)
+        frame = tk.Frame(dialog, bg="#f4f4f6", padx=8, pady=8)
         frame.pack(fill="both", expand=True)
-        view = tk.Text(frame, wrap="word", font=("Segoe UI", 11), bg="#f4f4f6")
+        active = [self.active_module if self.active_module in MODULES else "IC"]
+        tabs = tk.Frame(frame, bg="#f4f4f6")
+        tabs.pack(fill="x", pady=(0, 5))
+        buttons = {}
+        body = tk.Frame(frame, bg="#f4f4f6")
+        body.pack(fill="both", expand=True)
+        view = tk.Text(body, wrap="word", font=("Segoe UI", 9), bg="#f4f4f6",
+                       relief="flat", padx=4, pady=3)
         view.pack(side="left", fill="both", expand=True)
-        bar = ttk.Scrollbar(frame, orient="vertical", command=view.yview)
+        bar = ttk.Scrollbar(body, orient="vertical", command=view.yview)
         bar.pack(side="right", fill="y")
         view.configure(yscrollcommand=bar.set)
-        view.tag_configure("heading", foreground="#b61d31", font=("Segoe UI", 12, "bold"))
-        if not self.faq_entries:
-            view.insert("end", "Пока нет опубликованных записей FAQ.")
-        for item in self.faq_entries:
-            if not isinstance(item, dict):
-                continue
-            view.insert("end", str(item.get("name", "")) + chr(10), "heading")
-            view.insert("end", str(item.get("description", "")) + chr(10))
-            if item.get("extra_text"):
-                view.insert("end", str(item["extra_text"]) + chr(10))
-            view.insert("end", chr(10) + "─" * 32 + chr(10) * 2)
-        view.configure(state="disabled")
+        view.tag_configure("heading", foreground="#b61d31",
+                           font=("Segoe UI", 9, "bold"))
+        def show_module(module):
+            active[0] = module
+            for name, button in buttons.items():
+                selected = name == module
+                button.configure(bg="#c81930" if selected else "#c5c5cb",
+                                 fg="white" if selected else "#161616")
+            view.configure(state="normal")
+            view.delete("1.0", "end")
+            count = 0
+            for item in self.faq_entries:
+                if not isinstance(item, dict) or item.get("module", "IC") != module:
+                    continue
+                count += 1
+                view.insert("end", str(item.get("name", "")) + "\n", "heading")
+                view.insert("end", str(item.get("description", "")) + "\n")
+                if item.get("extra_text"):
+                    view.insert("end", str(item["extra_text"]) + "\n")
+                view.insert("end", "─" * 30 + "\n\n")
+            if not count:
+                view.insert("end", "Для блока " + module + " пока нет записей FAQ.")
+            view.configure(state="disabled")
+        for module in MODULES:
+            button = tk.Button(tabs, text=module, font=("Segoe UI", 9, "bold"),
+                               relief="raised", bd=1, padx=3, pady=3,
+                               command=lambda m=module: show_module(m))
+            button.pack(side="left", fill="x", expand=True, padx=2)
+            buttons[module] = button
+        show_module(active[0])
 
     def center_dialog(self, dialog, width, height, make_transient=True):
         self.update_idletasks()
