@@ -11,17 +11,17 @@ VSVersionInfo(
   ),
   kids=[
     StringFileInfo([
-      StringTable('040904B0', [
+      StringTable('041904B0', [
         StringStruct('CompanyName', 'D3DIMON3'),
-        StringStruct('FileDescription', 'M6GH AS-Built Config - Mazda 6 GH AS-Built configurator'),
+        StringStruct('FileDescription', 'M6GH AS-Built Config — конфигуратор AS-Built для Mazda 6 GH'),
         StringStruct('FileVersion', '1.0.0.0'),
         StringStruct('InternalName', 'M6GH-AS-Built-Config'),
-        StringStruct('LegalCopyright', 'Copyright (C) 2026 D3DIMON3'),
+        StringStruct('LegalCopyright', '© 2026 D3DIMON3'),
         StringStruct('OriginalFilename', 'M6GH-AS-Built-Config.exe'),
         StringStruct('ProductName', 'M6GH AS-Built Config'),
         StringStruct('ProductVersion', '1.0.0.0')
       ])
     ]),
-    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+    VarFileInfo([VarStruct('Translation', [1049, 1200])])
   ]
 )
