@@ -235,6 +235,10 @@ class WindowsConfig(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("M6GH AS-Built Config — Windows")
+        # Set the Tk window icon as well as the EXE icon.
+        icon_path = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)) / "M6GH-AS-Built-Config.ico"
+        if icon_path.is_file():
+            self.iconbitmap(default=str(icon_path))
         # Fit low-resolution Windows tablets while preserving desktop usability.
         self.update_idletasks()
         screen_w, screen_h = self.winfo_screenwidth(), self.winfo_screenheight()
