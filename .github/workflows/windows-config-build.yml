@@ -41,6 +41,22 @@ jobs:
       - name: Package executable
         working-directory: windows-config
         run: python -m PyInstaller --noconfirm --clean --onefile --windowed --version-file version_info.txt --icon "../M6GH-AS-Built-Config.ico" --add-data "../M6GH-AS-Built-Config.ico;." --add-data "default_admin_settings.json;." --name M6GH-AS-Built-Config main.py
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build Windows installer
+        working-directory: windows-config
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found: $iscc" }
+          & $iscc "/DTargetArch=${{ matrix.architecture }}" installer.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: M6GH-AS-Built-Config-Setup-Windows-${{ matrix.architecture }}
+          path: windows-config/dist-installer/M6GH-AS-Built-Config-Setup-${{ matrix.architecture }}.exe
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: M6GH-AS-Built-Config-Windows-${{ matrix.architecture }}
