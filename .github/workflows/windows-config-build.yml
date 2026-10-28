@@ -40,7 +40,7 @@ jobs:
           Set-Content -Path windows-config/public_connection.py -Value ("PUBLISHABLE_KEY = " + $json) -Encoding utf8
       - name: Package executable
         working-directory: windows-config
-        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --version-file version_info.txt --icon "../M6GH-AS-Built-Config.ico" --add-data "default_admin_settings.json;." --name M6GH-AS-Built-Config main.py
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --version-file version_info.txt --icon "../M6GH-AS-Built-Config.ico" --add-data "../M6GH-AS-Built-Config.ico;." --add-data "default_admin_settings.json;." --name M6GH-AS-Built-Config main.py
       - uses: actions/upload-artifact@v4
         with:
           name: M6GH-AS-Built-Config-Windows-${{ matrix.architecture }}
